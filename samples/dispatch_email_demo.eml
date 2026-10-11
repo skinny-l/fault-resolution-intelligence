@@ -1,0 +1,22 @@
+From: Dispatch <dispatch@example.invalid>
+To: Field Engineering <field@example.invalid>
+Subject: [DEMO-00417] Memory fault - SC-2200R - Hall-B Row-04 Rack-22
+Date: Thu, 20 Aug 2026 09:14:00 +0800
+Content-Type: text/plain; charset=utf-8
+
+工单标签/tags：demo
+工单编号/ticket_number：DEMO-00417
+server_model：SC-2200R server_product：SCR2200-D2-N24
+服务器序列号/server_sn：SC2200R-DEMO-31775
+服务器厂商/manufacturer：SynthCore Systems
+故障类型/fault_type：Memory
+部件类型/part_type：DIMM
+部件位置/part_position：CPU0_C0
+错误码/error_code：ECC_CE_THRESH
+故障描述/fault_description：Correctable ECC error logging limit reached on DIMM_CPU0_C0. Node remains in service. Correctable error count rose from 12 to 4,118 over 36 hours.
+报障时间/report_time：2026-08-20 04:15:02
+最近30天报修次数/number_of_repairs_in_past_30_days：1
+最近60天报修次数/number_of_repairs_in_past_60_days：1
+
+This is a synthetic sample message for the demo dataset. The addresses use
+the reserved .invalid TLD and resolve nowhere.

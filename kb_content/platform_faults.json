@@ -1,0 +1,128 @@
+[
+  {
+    "category": "Storage",
+    "error_code": "SMART_5",
+    "fault_description": "SMART attribute 5 (Reallocated Sector Count) climbing on an SC-1150S storage node LFF drive.",
+    "affected_parts": "SC-HD18T 18TB SAS drive",
+    "root_cause": "Sectors already reallocated from the spare pool. A climbing count means the pool is being consumed.",
+    "solution": "1. Read attributes 5, 197 and 198 together — the trio, not attribute 5 alone, tells you the trajectory.\n2. A stable non-zero count on an older drive is normal wear; a climbing count is a replacement.\n3. Confirm array protection, then hot-swap.\n4. On SC-1150S, verify the replacement is recognised by the controller before closing — LFF bays on this platform need the carrier fully latched to make the SAS connection.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_187",
+    "fault_description": "SMART attribute 187 (Reported Uncorrectable Errors) non-zero. The drive has returned data it could not correct.",
+    "affected_parts": "SC-HD18T SAS drive; SC-NV7T6 NVMe drive",
+    "root_cause": "Uncorrectable read errors reached the host. Data loss has already occurred on those blocks.",
+    "solution": "1. Any non-zero value here is significant — unlike pending sectors, these errors reached the application.\n2. Verify the array rebuilt or the data was protected.\n3. Replace the drive.\n4. Check whether the filesystem logged corresponding errors, and flag affected data.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_198",
+    "fault_description": "SMART attribute 198 (Offline Uncorrectable) non-zero after a background scan.",
+    "affected_parts": "SC-HD18T SAS drive",
+    "root_cause": "The drive's own background scan found sectors it cannot read. These have not yet been hit by the host.",
+    "solution": "1. Run a long self-test to confirm.\n2. Treat as a pre-failure indicator — schedule replacement rather than waiting for host-visible errors.\n3. Replace at the next maintenance window unless the count is climbing quickly.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "SC_DIMM_POP_ORDER",
+    "fault_description": "SC-3300M quad-socket node boots with far less memory than installed, or halts at memory training.",
+    "affected_parts": "SC-DR64G RDIMM; SC-MB2200 memory slots",
+    "root_cause": "DIMM population does not follow the platform's documented order. On SC-3300M the population rule differs from the two-socket platforms and is the most common cause of a capacity mismatch on this model.",
+    "solution": "1. Compare installed population against the documented order for SC-3300M specifically — do not assume the SC-2200R rule applies.\n2. Repopulate to the documented order.\n3. Clear CMOS to discard the stale training profile, then power on.\n4. Confirm full capacity in BIOS and in the OS before closing.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "SC_DIMM_MIXED_RANK",
+    "fault_description": "Memory runs below rated speed, or training fails intermittently, on a node with mixed DIMM types.",
+    "affected_parts": "SC-DR64G RDIMM and other DDR5 modules",
+    "root_cause": "Mixed rank or mixed speed modules within a channel. The controller falls back to the lowest common denominator or fails to train at all.",
+    "solution": "1. Inventory every module: `dmidecode -t memory` and compare part numbers, ranks and speeds.\n2. Any mismatch within a channel explains the symptom.\n3. Standardise the channel on a single module type.\n4. Do not mix a replacement DIMM of a different rank into an existing channel — pull matching modules instead.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "SC_XA400_POWER_CABLE",
+    "fault_description": "SC-XA400 accelerator not detected, or detected then dropping under load, on an SC-4800G node.",
+    "affected_parts": "SC-XA400 accelerator module; auxiliary power cabling; SC-RS16X riser",
+    "root_cause": "An auxiliary power connector not fully latched. Under idle the module may enumerate; under load it browns out and drops.",
+    "solution": "1. A module that enumerates at idle but drops under load is almost always a power cabling problem, not a module fault.\n2. Power down and reseat both ends of every auxiliary power lead to the affected module.\n3. Confirm each connector latches audibly.\n4. Run a sustained load test before returning to service — an idle check will not reproduce this.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "SC_XA400_THERMAL_SKEW",
+    "fault_description": "One SC-XA400 module runs 15-20C hotter than its peers in the same SC-4800G chassis.",
+    "affected_parts": "SC-XA400 accelerator module; air baffle; SC-FN80D fans",
+    "root_cause": "Airflow maldistribution — a misfitted baffle, a missing blanking panel, or a heatsink contact problem on that module.",
+    "solution": "1. Read all eight module temperatures and confirm the skew is real and sustained, not a transient load imbalance.\n2. Check the baffle and blanking panels around the hot module.\n3. Confirm fan health upstream of that position.\n4. If airflow is confirmed good, the module's own heatsink contact is suspect — escalate for module replacement.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "SC_PSU_MIXED_RATING",
+    "fault_description": "PSUs fail to share load, or the node refuses to power on with both supplies installed.",
+    "affected_parts": "SC-PS2000 power supply",
+    "root_cause": "Mismatched supply ratings or firmware levels in the same chassis. SC platforms require matched pairs.",
+    "solution": "1. Read both supplies' model and firmware: `ipmitool fru print` and the PSU entries in the log bundle.\n2. Any rating or firmware mismatch explains the symptom.\n3. Replace so both supplies match.\n4. On SC-4800G this matters more than on the other platforms — accelerator nodes cannot run on one supply under load.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Thermal",
+    "error_code": "SC_BAFFLE_MISSING",
+    "fault_description": "Multiple thermal warnings across unrelated components — DIMMs, processors and accelerators all running warm simultaneously.",
+    "affected_parts": "Air baffle; SC-FN80D fans",
+    "root_cause": "The air baffle is missing or misfitted, so chassis airflow bypasses the components it is meant to direct air across.",
+    "solution": "1. Simultaneous warnings across unrelated components is the signature — a component fault does not produce this pattern.\n2. Open the node and check the baffle is present, correctly oriented, and fully seated.\n3. Check every blanking panel and drive blank is fitted.\n4. Close up and confirm temperatures normalise under load.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "BIOS",
+    "error_code": "SC_BOOT_MODE_MISMATCH",
+    "fault_description": "Node will not boot an installed OS after a board or BIOS change. The drive enumerates correctly.",
+    "affected_parts": "BIOS boot mode setting; boot drive",
+    "root_cause": "Boot mode reverted to the platform default and no longer matches how the OS was installed.",
+    "solution": "1. Check the current boot mode against how the OS was installed.\n2. A replaced board or a CMOS clear resets this to the platform default — a very common post-repair symptom.\n3. Set the mode to match the installation, save, and reboot.\n4. Record the site's required setting so the next board swap does not repeat this.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Firmware",
+    "error_code": "SC_FW_UPDATE_ORDER",
+    "fault_description": "Firmware update leaves the node in an inconsistent state — sensors missing, or the BMC reporting the old BIOS version.",
+    "affected_parts": "CoreBMC firmware; BIOS; CPLD",
+    "root_cause": "Components updated out of order. SC platforms require BMC first, then BIOS, then CPLD, with a full AC cycle at the end.",
+    "solution": "1. Read all three current versions.\n2. Redo the update in the documented order — BMC, BIOS, CPLD. Order is not advisory on this platform.\n3. Perform a full AC power cycle, not a warm reboot.\n4. Confirm all three versions read back correctly before closing.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Network",
+    "error_code": "SC_OCP_SLOT_LANE",
+    "fault_description": "SC-NX200 adapter negotiates x8 instead of x16 in the OCP slot on SC-2400H.",
+    "affected_parts": "SC-NX200 OCP adapter; OCP slot; SC-RS16X riser",
+    "root_cause": "On SC-2400H the OCP slot shares lanes with riser 2. Populating riser 2 bifurcates the OCP slot to x8 by design.",
+    "solution": "1. Confirm the negotiated width with `lspci -vv | grep -i lnksta`.\n2. Check whether riser 2 is populated. If it is, this is expected platform behaviour, not a fault.\n3. If full width is required, move the riser 2 device or accept the narrower link.\n4. Do not replace the adapter for this symptom on SC-2400H.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "SC_BP_CABLE_ORDER",
+    "fault_description": "Drive bay numbering in the OS does not match the physical bay labels after a backplane or cable replacement.",
+    "affected_parts": "SC-BP24N backplane; backplane sideband cabling",
+    "root_cause": "Backplane cables connected in the wrong order. Bays enumerate, but the mapping is scrambled — which means a subsequent drive replacement pulls the wrong drive.",
+    "solution": "1. Treat this as urgent. A scrambled map will cause someone to pull a healthy drive from a degraded array.\n2. Verify the cable order against the documented mapping for the platform.\n3. Correct the cabling and confirm bay 1 in the OS is physically bay 1.\n4. Verify the full mapping bay by bay before returning the node to service.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "SC_RISER_SLOT_PRIORITY",
+    "fault_description": "A PCIe device works in one riser slot but not another on the same SC-2200R node.",
+    "affected_parts": "SC-RS16X riser; SC-MB2200 system board",
+    "root_cause": "Slot lane allocation differs between riser positions on SC-2200R. Not every slot provides full width or the same bifurcation options.",
+    "solution": "1. Check the slot's documented lane allocation before assuming a fault.\n2. Confirm the device's width requirement against what the slot provides.\n3. Move the device to a slot that meets its requirement.\n4. This is a configuration constraint, not a hardware fault — do not raise a parts request.",
+    "source": "Demo dataset — SC platform notes (synthetic)"
+  }
+]

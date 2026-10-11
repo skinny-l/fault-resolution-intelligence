@@ -1,0 +1,28 @@
+smartctl 7.4 — SC-HD18T 18TB SAS 7.2K LFF (demo capture, synthetic)
+
+Device Model:     SC-HD18T
+Serial Number:    SCHD18T-DEMO-40117
+Firmware Version: SC0142
+User Capacity:    18,000,207,937,536 bytes [18.0 TB]
+Rotation Rate:    7200 rpm
+SMART overall-health self-assessment test result: PASSED
+
+ID# ATTRIBUTE_NAME           VALUE WORST THRESH RAW_VALUE
+  1 Raw_Read_Error_Rate        083   074   006   194837221
+  5 Reallocated_Sector_Ct      091   091   010   744
+  9 Power_On_Hours             058   058   000   37122
+187 Reported_Uncorrect         096   096   000   4
+188 Command_Timeout            100   100   000   0
+194 Temperature_Celsius        031   044   000   38
+197 Current_Pending_Sector     088   088   000   162
+198 Offline_Uncorrectable      088   088   000   162
+199 UDMA_CRC_Error_Count       200   200   000   0
+
+SMART Self-test log:
+Num  Test_Description  Status                      LifeTime  LBA_of_first_error
+# 1  Extended offline  Completed: read failure      37118     3921004832
+# 2  Short offline     Completed without error      37002     -
+
+Note: attributes 5, 197 and 198 are all non-zero and 197 has risen from 41
+to 162 over eight days. Overall health still reports PASSED — which is why
+the overall verdict is not the deciding signal.
