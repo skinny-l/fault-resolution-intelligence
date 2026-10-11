@@ -1,0 +1,9 @@
+bay,device,model,serial,capacity_tb,link_width,link_speed,health
+0,/dev/nvme0n1,SC-NV7T6,SCNV7T6-DEMO-10041,7.68,x4,Gen5,OK
+1,/dev/nvme1n1,SC-NV7T6,SCNV7T6-DEMO-10042,7.68,x4,Gen5,OK
+2,/dev/nvme2n1,SC-NV7T6,SCNV7T6-DEMO-10043,7.68,x2,Gen5,DEGRADED_LINK
+3,/dev/nvme3n1,SC-NV7T6,SCNV7T6-DEMO-10044,7.68,x4,Gen5,MEDIA_ERRORS
+4,/dev/nvme4n1,SC-NV7T6,SCNV7T6-DEMO-10045,7.68,x4,Gen5,OK
+5,/dev/nvme5n1,SC-NV7T6,SCNV7T6-DEMO-10046,7.68,x4,Gen5,OK
+6,,,,,,,ABSENT
+7,/dev/nvme7n1,SC-NV7T6,SCNV7T6-DEMO-10048,7.68,x4,Gen5,OK

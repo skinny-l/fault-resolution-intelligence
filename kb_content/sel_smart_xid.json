@@ -1,0 +1,272 @@
+[
+  {
+    "category": "Board",
+    "error_code": "SEL_0x04",
+    "fault_description": "SEL event 0x04 — sensor threshold crossed, lower non-critical. The earliest warning the BMC raises for a monitored sensor.",
+    "affected_parts": "Any monitored sensor",
+    "root_cause": "A reading drifting out of its normal band. Informational at this severity.",
+    "solution": "Identify the sensor from the event, read its current value, and trend it. Act when it reaches critical, not here — unless the drift is fast.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "SEL_0x07",
+    "fault_description": "SEL event 0x07 — sensor threshold crossed, lower critical. The reading is outside acceptable limits.",
+    "affected_parts": "Any monitored sensor",
+    "root_cause": "A rail, fan or temperature sensor below its critical threshold.",
+    "solution": "Identify the sensor and treat according to its category. A critical crossing is actionable; correlate with any other events in the same second.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "SEL_0x0A",
+    "fault_description": "SEL event 0x0A — sensor threshold crossed, upper critical.",
+    "affected_parts": "Any monitored sensor",
+    "root_cause": "A reading above its critical threshold — most often a temperature or a fan running out of range.",
+    "solution": "Identify the sensor, check the category-specific cause, and correlate against inlet temperature before assuming a node fault.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "SEL_0x11",
+    "fault_description": "SEL event 0x11 — power supply AC input lost.",
+    "affected_parts": "SC-PS2000 power supply; PDU outlet; power cord",
+    "root_cause": "Loss of AC at the supply inlet. An input-side event, not a supply failure.",
+    "solution": "Check the PSU input LED, trace the cord to its outlet, and confirm the outlet is live before touching the supply.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "SEL_0x14",
+    "fault_description": "SEL event 0x14 — power supply predictive failure asserted.",
+    "affected_parts": "SC-PS2000 power supply",
+    "root_cause": "The supply's own monitoring detected degradation ahead of an out-of-spec output.",
+    "solution": "Verify the peer supply is healthy, then hot-swap the asserting unit. Do not wait for hard failure.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "SEL_0x16",
+    "fault_description": "SEL event 0x16 — power unit redundancy lost.",
+    "affected_parts": "SC-PS2000 power supplies; AC feeds",
+    "root_cause": "One supply is no longer contributing — failed, removed, or without AC.",
+    "solution": "Determine which supply and why. Redundancy loss on a single-feed rack means the node is one event away from dropping.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Thermal",
+    "error_code": "SEL_0x1C",
+    "fault_description": "SEL event 0x1C — fan sensor below lower non-recoverable threshold.",
+    "affected_parts": "SC-FN80D fan module",
+    "root_cause": "A rotor stopped or slowed past recovery.",
+    "solution": "Hot-swap the fan module. Confirm both rotors report in range afterwards.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Thermal",
+    "error_code": "SEL_0x1F",
+    "fault_description": "SEL event 0x1F — thermal trip, system shut down to protect hardware.",
+    "affected_parts": "SC-CP9480 processor; heatsink; SC-FN80D fans",
+    "root_cause": "A component exceeded its shutdown temperature.",
+    "solution": "Establish why before powering back on. Check fan health, inlet temperature, baffle fitment and heatsink contact in that order.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "SEL_0x21",
+    "fault_description": "SEL event 0x21 — memory correctable ECC error logged with DIMM location.",
+    "affected_parts": "SC-DR64G RDIMM",
+    "root_cause": "A correctable error on the identified module.",
+    "solution": "Note the location, read per-DIMM counters, and decide on the pattern — one module versus a whole channel.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "SEL_0x23",
+    "fault_description": "SEL event 0x23 — memory uncorrectable ECC error with DIMM location.",
+    "affected_parts": "SC-DR64G RDIMM; memory controller",
+    "root_cause": "A hard fault on the identified module, or a controller fault if the pattern is channel-wide.",
+    "solution": "Record the location before rebooting. Replace the module; escalate to board if errors follow the slot.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "CPU",
+    "error_code": "SEL_0x2B",
+    "fault_description": "SEL event 0x2B — processor internal error (IERR) asserted, with socket identified.",
+    "affected_parts": "SC-CP9480 processor",
+    "root_cause": "An uncorrectable internal processor error.",
+    "solution": "Collect the screen capture from the log bundle before rebooting, then reseat and inspect the socket.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Firmware",
+    "error_code": "SEL_0x31",
+    "fault_description": "SEL event 0x31 — watchdog timer expired, node reset by the BMC.",
+    "affected_parts": "CoreBMC watchdog; host OS",
+    "root_cause": "The host stopped servicing the watchdog. Points at a hung host, not at failed hardware.",
+    "solution": "Investigate the host OS. A watchdog reset with no other SEL event is a software problem, not a parts request.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_1",
+    "fault_description": "SMART attribute 1 — Raw Read Error Rate. Vendor-scaled; only meaningful as a trend against itself.",
+    "affected_parts": "SC-HD18T SAS drive",
+    "root_cause": "Read channel errors, most of which are corrected internally.",
+    "solution": "Do not act on the raw value. Trend it against the same drive's history; act on attributes 5, 197 and 198.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_5",
+    "fault_description": "SMART attribute 5 — Reallocated Sector Count. Sectors already mapped out to the spare pool.",
+    "affected_parts": "SC-HD18T SAS drive; SC-NV7T6 NVMe drive",
+    "root_cause": "Media defects permanently remapped.",
+    "solution": "A stable non-zero count is wear. A climbing count is a replacement. Read alongside 197 and 198.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_9",
+    "fault_description": "SMART attribute 9 — Power-On Hours. Cumulative service time.",
+    "affected_parts": "Any drive",
+    "root_cause": "Not a fault indicator. Context for interpreting wear attributes.",
+    "solution": "Use to judge whether a non-zero wear count is expected for the drive's age. Never a replacement trigger on its own.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_187",
+    "fault_description": "SMART attribute 187 — Reported Uncorrectable Errors. Errors that reached the host.",
+    "affected_parts": "SC-HD18T SAS drive",
+    "root_cause": "Reads the drive could not correct, returned as errors.",
+    "solution": "Any non-zero value is significant — this data reached the application. Replace and flag affected data.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_188",
+    "fault_description": "SMART attribute 188 — Command Timeout. Commands that did not complete in time.",
+    "affected_parts": "SC-HD18T SAS drive; SC-BP24N backplane; cabling",
+    "root_cause": "A drive struggling internally, or a marginal bus. A climbing count with clean media attributes points at the bus.",
+    "solution": "Correlate with media attributes. Clean media plus climbing timeouts means check the backplane and cabling, not the drive.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_194",
+    "fault_description": "SMART attribute 194 — Temperature. Current drive temperature.",
+    "affected_parts": "Any drive",
+    "root_cause": "Sustained high temperature accelerates wear and raises error rates.",
+    "solution": "Check against airflow and blanking panels. A single hot drive in a populated bank points at that bay.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_197",
+    "fault_description": "SMART attribute 197 — Current Pending Sector Count. Sectors awaiting reallocation.",
+    "affected_parts": "SC-HD18T SAS drive",
+    "root_cause": "Sectors that failed a read and have not yet been remapped.",
+    "solution": "A climbing pending count reliably precedes user-visible errors. Replace rather than watch.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_198",
+    "fault_description": "SMART attribute 198 — Offline Uncorrectable. Sectors the background scan cannot read.",
+    "affected_parts": "SC-HD18T SAS drive",
+    "root_cause": "Media defects found by the drive's own scan before the host hit them.",
+    "solution": "Treat as pre-failure. Schedule replacement; escalate if the count climbs between reads.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_199",
+    "fault_description": "SMART attribute 199 — UDMA CRC Error Count. Errors on the interface, not the media.",
+    "affected_parts": "SC-BP24N backplane; drive carrier; cabling",
+    "root_cause": "Interface signal integrity — a connector or cable problem. Not a media problem.",
+    "solution": "This attribute exonerates the media. Reseat the drive, clean the bay connector, and check cabling before replacing the drive.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_231",
+    "fault_description": "SMART attribute 231 — SSD Life Left. Remaining endurance as a percentage.",
+    "affected_parts": "SC-NV7T6 NVMe drive",
+    "root_cause": "Normal NAND wear from accumulated writes.",
+    "solution": "Plan replacement as the value approaches the site threshold. Not a fault — a capacity planning input.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_198",
+    "fault_description": "Xid 198 — memory rows pending remap on an accelerator module.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "Rows retired after correctable errors; the remap has not yet been applied.",
+    "solution": "Drain the node and reset the module to apply the remap. Replace if rows keep being retired afterwards.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_205",
+    "fault_description": "Xid 205 — double-bit error in accelerator on-die memory.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "An uncorrectable memory error on the module.",
+    "solution": "Reset and re-run diagnostics. A recurrence on the same module is conclusive — replace.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_212",
+    "fault_description": "Xid 212 — accelerator fell off the PCIe bus.",
+    "affected_parts": "SC-XA400 accelerator module; SC-RS16X riser; auxiliary power",
+    "root_cause": "A module, riser or power delivery failure. All three present identically.",
+    "solution": "Check for a rail event at the same timestamp first. Then reseat module, riser and power leads, and swap slots to isolate.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_219",
+    "fault_description": "Xid 219 — accelerator reset required before the module can be used again.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "The module entered an unrecoverable state and needs a reset to return to service.",
+    "solution": "Drain workloads, reset the module, confirm it returns healthy. Investigate the preceding error, not the reset itself.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_226",
+    "fault_description": "Xid 226 — accelerator watchdog timeout. A workload stopped responding on the module.",
+    "affected_parts": "SC-XA400 accelerator module; host workload",
+    "root_cause": "Often a workload fault rather than a hardware fault.",
+    "solution": "Correlate against the workload before suspecting hardware. A single module with repeated watchdog events across different workloads is the hardware case.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_233",
+    "fault_description": "Xid 233 — uncontained ECC error on accelerator memory.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "An uncorrectable error that could not be contained to one process.",
+    "solution": "Record the bus ID and error, reset the module, run a memory diagnostic. A repeat on the same module is a replacement.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_241",
+    "fault_description": "Xid 241 — inter-module link error between two accelerators.",
+    "affected_parts": "SC-XA400 accelerator modules; inter-module bridge",
+    "root_cause": "A bridge connector or a link fault on one of the two endpoints.",
+    "solution": "Reseat the bridge at both ends, then swap the bridge before suspecting either module.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_247",
+    "fault_description": "Xid 247 — accelerator power brake asserted. Clocks capped by the power subsystem.",
+    "affected_parts": "SC-XA400 accelerator module; SC-PS2000 power supplies",
+    "root_cause": "The node is at its power envelope, or a supply is not contributing.",
+    "solution": "Check PSU redundancy and load sharing. A node running on one supply will brake its accelerators by design.",
+    "source": "Demo dataset — SEL/SMART/Xid reference (synthetic)"
+  }
+]

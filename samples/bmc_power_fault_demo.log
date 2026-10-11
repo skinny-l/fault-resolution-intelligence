@@ -1,0 +1,22 @@
+CoreBMC 3.4.1 — power fault capture (demo, synthetic)
+Platform: SC-2200R / SCR2200-D2-N24
+Serial:   SC2200R-DEMO-88214
+
+2026-07-03T22:41:06Z  SEQ  power-on requested via BMC
+2026-07-03T22:41:06Z  SEQ  step 1/9  P12V_STBY        OK
+2026-07-03T22:41:06Z  SEQ  step 2/9  P5V_AUX          OK
+2026-07-03T22:41:06Z  SEQ  step 3/9  P3V3_AUX         OK
+2026-07-03T22:41:07Z  SEQ  step 4/9  P12V_MAIN        OK
+2026-07-03T22:41:07Z  SEQ  step 5/9  PVCCIN_CPU0      OK
+2026-07-03T22:41:07Z  SEQ  step 6/9  PVCCIN_CPU1      OK
+2026-07-03T22:41:07Z  SEQ  step 7/9  PVDDQ_AB_CPU0    FAULT
+2026-07-03T22:41:07Z  ERR  RAIL_PVDDQ_AB_CPU0_FAULT asserted
+2026-07-03T22:41:08Z  ERR  PWR_GOOD_TIMEOUT — sequence aborted at step 7/9
+2026-07-03T22:41:08Z  SEQ  returning to standby
+
+PSU status at fault:
+  PSU1  present, AC OK, output OK, 412W
+  PSU2  present, AC OK, output OK, 408W
+  load sharing balanced
+
+Note: PVDDQ_AB_CPU0 feeds DIMM slots CPU0_A0 and CPU0_B0 only.

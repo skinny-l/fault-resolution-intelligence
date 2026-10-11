@@ -1,0 +1,92 @@
+[
+  {
+    "category": "GPU",
+    "error_code": "XID_212_FALLEN_OFF_BUS",
+    "fault_description": "Accelerator module drops off the PCIe bus at runtime. Workloads fail and the module disappears from inventory until reboot.",
+    "affected_parts": "SC-XA400 accelerator module; SC-RS16X riser; auxiliary power cabling",
+    "root_cause": "A hard fault on the module, a power delivery failure, or a riser link failure. All three present identically.",
+    "solution": "1. Capture the kernel log around the event and the BMC SEL for the same timestamp.\n2. Check for a rail or PSU event in the same second. If present, treat as a power fault first.\n3. Power down and reseat the module, its riser and its auxiliary power leads.\n4. Move the module to a different slot. If the fault follows the module, replace it; if it stays with the slot, replace the riser.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_233_UNCONTAINED_ECC",
+    "fault_description": "Uncontained ECC error on accelerator on-die memory. The affected workload is killed and the module requires a reset.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "An uncorrectable memory error on the module that could not be contained to a single process.",
+    "solution": "1. Record the module's bus ID and the exact error from the kernel log.\n2. Read the module's own error counters and retired-page status.\n3. A single uncontained event may be recoverable with a module reset; a repeat on the same module is a replacement.\n4. Run a memory diagnostic pass on the module before returning it to service.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_198_REMAP_PENDING",
+    "fault_description": "Accelerator reports memory rows pending remap. The module still functions but has retired capacity.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "Memory rows retired after correctable errors. Expected in small numbers; significant when climbing.",
+    "solution": "1. Read the remapped-row counters and compare against the module's threshold.\n2. A pending remap requires a module reset to take effect — the module is not fully healthy until it does.\n3. Drain the node, reset the module, and confirm the remap completed.\n4. Replace if rows continue to be retired after the remap.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "XID_205_DOUBLE_BIT",
+    "fault_description": "Double-bit error on accelerator memory. The module is unusable until reset.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "An uncorrectable double-bit error in on-die memory.",
+    "solution": "1. Capture the full error report and the module bus ID.\n2. Reset the module and re-run diagnostics.\n3. A double-bit error that recurs on the same module is conclusive — replace.\n4. Check whether the module is also running thermally hot; sustained over-temperature raises error rates.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "ACCEL_THERMAL_SLOWDOWN",
+    "fault_description": "Accelerator clocks drop sharply under load. Throughput falls well below expected without any error being logged.",
+    "affected_parts": "SC-XA400 accelerator module; SC-FN80D fans; air baffle",
+    "root_cause": "Thermal throttling. The module is protecting itself and reporting no fault because nothing has failed.",
+    "solution": "1. Read module temperatures and clock states under load, not at idle.\n2. Compare against peer modules in the same chassis.\n3. Check airflow — baffle, blanking panels and fan health.\n4. If one module alone is hot with airflow confirmed good, its heatsink contact is suspect.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "ACCEL_LINK_WIDTH_LOW",
+    "fault_description": "Accelerator negotiates a narrower PCIe link than the slot provides. Host-to-module transfers are slow.",
+    "affected_parts": "SC-XA400 accelerator module; SC-RS16X riser",
+    "root_cause": "A partially seated module or riser, or a contaminated slot.",
+    "solution": "1. Read the negotiated width and compare against the capability line.\n2. Reseat the module and riser.\n3. Re-read after reseating — most cases clear here.\n4. Move to another slot to determine whether the fault follows the module or the slot.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "ACCEL_ECC_DISABLED",
+    "fault_description": "Accelerator reports ECC disabled. Memory errors will go undetected.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "ECC was disabled in the module's persistent configuration, usually deliberately during a previous investigation and never re-enabled.",
+    "solution": "1. Read the current ECC state for every module in the node.\n2. Re-enable ECC and reset the module for the change to take effect.\n3. Confirm the state persists across a reboot.\n4. Treat any error history collected while ECC was disabled as unreliable.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "ACCEL_INFOROM_CORRUPT",
+    "fault_description": "Accelerator's on-module information store reports corruption. Inventory and error history are unreliable.",
+    "affected_parts": "SC-XA400 accelerator module",
+    "root_cause": "Corruption in the module's persistent configuration and history store.",
+    "solution": "1. Confirm the corruption is reported consistently across reboots.\n2. Note that the module's own error history can no longer be trusted for diagnosis.\n3. A module that cannot record its own error history should not stay in production.\n4. Replace the module.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "ACCEL_PEER_LINK_DOWN",
+    "fault_description": "Inter-module link between two accelerators is down. Multi-module workloads fail or fall back to host-mediated transfers.",
+    "affected_parts": "SC-XA400 accelerator modules; inter-module bridge connector",
+    "root_cause": "A bridge connector not fully seated, or a failed link on one of the two modules.",
+    "solution": "1. Identify both endpoints from the link topology.\n2. Power down and reseat the bridge connector at both ends.\n3. If the link stays down, swap the bridge before suspecting either module.\n4. If a known-good bridge also fails, isolate which of the two modules is at fault by testing each against a third.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  },
+  {
+    "category": "GPU",
+    "error_code": "ACCEL_NOT_ENUMERATED",
+    "fault_description": "One or more accelerator modules absent from PCIe enumeration after a reboot. The node otherwise boots normally.",
+    "affected_parts": "SC-XA400 accelerator module; SC-RS16X riser; auxiliary power cabling",
+    "root_cause": "A seating, riser or power delivery problem. A module that was working before a reboot and is now absent is rarely a module failure.",
+    "solution": "1. Count modules in `lspci` and compare against the expected population.\n2. Check the POST code — a halt during PCIe enumeration points at a device fault.\n3. Power down and reseat the missing module, its riser and its power leads.\n4. Check for a rail event in the SEL from the last power-on.",
+    "source": "Demo dataset — accelerator fault codes (synthetic)"
+  }
+]

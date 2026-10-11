@@ -1,0 +1,14 @@
+# FIARS runs on the Python standard library only. This file is intentionally
+# empty of runtime dependencies — see the "Zero dependencies was a constraint"
+# section of README.md for why.
+#
+# Optional, only if you want the extra raw-dump formats:
+#   pymupdf                 # .pdf text extraction
+#   pytesseract, Pillow     # OCR for scanned images (also needs Tesseract)
+#
+# Optional, for running the test suite with pytest instead of directly:
+#   pytest
+#
+# A sentence-transformers + FAISS semantic-search layer was evaluated and
+# deliberately not adopted. ARCHITECTURE.md still proposes it; README.md
+# explains why it was rejected.

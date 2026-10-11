@@ -1,0 +1,155 @@
+[
+  {
+    "category": "Thermal",
+    "error_code": "FAN_TACH_LOW",
+    "fault_description": "BMC reports fan tachometer below the lower non-recoverable threshold on one rotor of a dual-rotor module. Chassis fans ramp to 100% and an amber health LED lights.",
+    "affected_parts": "SC-FN80D 80mm dual-rotor fan module",
+    "root_cause": "Rotor bearing wear or a seized rotor. On dual-rotor modules the surviving rotor keeps airflow within limits, so the system stays up and the fault presents as a threshold crossing rather than a thermal event.",
+    "solution": "1. Confirm the failing rotor with `ipmitool sensor list | grep -i fan` and note which of FAN1_R/FAN1_F is reading low.\n2. Fan modules are hot-swappable on all SC platforms — no shutdown required.\n3. Release the latch, extract the module, seat the replacement until the latch clicks.\n4. Wait 60s for the BMC to re-read the sensor, then confirm both rotors report within range.\n5. Clear the SEL entry and verify the health LED returns to green.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Thermal",
+    "error_code": "FAN_REDUNDANCY_LOST",
+    "fault_description": "Fan redundancy lost event asserted in the SEL with no individual fan below threshold. Airflow is sufficient but the N+1 margin is gone.",
+    "affected_parts": "SC-FN80D fan module; SC-MB2200 system board fan connector",
+    "root_cause": "Usually a fan module that has lost BMC presence detect rather than a mechanical failure — a partially seated module or an oxidised connector. A genuine board-side connector fault is the less common cause.",
+    "solution": "1. Reseat each fan module in turn, checking `ipmitool sdr list | grep -i fan` for presence after each.\n2. If presence returns after reseating, the module was under-seated — monitor for 24h.\n3. If one slot never reports presence with a known-good module, the fault is board-side; escalate for system board replacement.\n4. Do not replace fan modules speculatively — this fault is a presence problem far more often than a mechanical one.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "PSU_PREDICTIVE_FAIL",
+    "fault_description": "One PSU asserts predictive failure. Output is still within spec and the system is carrying load normally on both supplies.",
+    "affected_parts": "SC-PS2000 2000W CRPS power supply",
+    "root_cause": "Internal fan degradation or an ageing output capacitor bank detected by the PSU's own monitoring before output drifts out of spec.",
+    "solution": "1. Identify the asserting slot: `ipmitool sdr list | grep -i psu`.\n2. Verify the peer PSU is healthy and carrying load before touching anything — a predictive-fail PSU is still supplying power.\n3. Confirm both AC feeds are live; pulling a good PSU on a single-feed rack drops the node.\n4. Hot-swap the asserting PSU. CRPS units are hot-pluggable on all SC platforms.\n5. Confirm the new unit reports present and sharing load, then clear the SEL.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "PSU_AC_LOST",
+    "fault_description": "PSU reports AC input lost. The node stays up on the surviving supply; a second AC loss would drop it.",
+    "affected_parts": "SC-PS2000 power supply; rack PDU outlet; C13/C14 power cord",
+    "root_cause": "Upstream: a tripped PDU outlet, a dislodged cord, or a failed PDU branch. The PSU itself is usually healthy — this is an input-side event, not a supply failure.",
+    "solution": "1. Check the PSU input LED before anything else. Dark means no AC present; amber means the supply itself faulted.\n2. Trace the cord to its PDU outlet and confirm the outlet is energised and not tripped.\n3. Reseat the cord at both ends.\n4. If the outlet is dead, this is a facilities issue — hand off rather than replacing the PSU.\n5. Replace the PSU only if AC is confirmed present at the inlet and the supply still reports input lost.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "MB_VR_FAULT",
+    "fault_description": "Voltage regulator fault asserted on a board-mounted rail. The node either fails to power on or drops under load.",
+    "affected_parts": "SC-MB2200 system board; SC-CP9480 processor",
+    "root_cause": "A failed VR phase on the system board, or a processor drawing outside its expected envelope and tripping the regulator's protection.",
+    "solution": "1. Capture the full SEL and the failing rail name before power-cycling — the event is lost after AC removal on some firmware levels.\n2. Remove AC for 60s, then retry power-on with the minimum configuration (one CPU, one DIMM per channel).\n3. If minimum config powers on, add components back in groups to isolate.\n4. If a PVCCIN rail is implicated, reseat that processor and inspect the socket for bent pins under good light.\n5. Socket damage or a repeating rail fault at minimum config means system board replacement.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "BP_PRESENCE_LOST",
+    "fault_description": "Backplane presence lost. An entire bank of drive bays disappears at once from both the OS and the BMC.",
+    "affected_parts": "SC-BP24N 24-bay NVMe backplane; backplane power and sideband cabling",
+    "root_cause": "A dislodged backplane power or sideband cable, or a failed backplane. A whole bank vanishing at once points at the backplane, not at the drives.",
+    "solution": "1. A whole bank going dark is a backplane symptom — do not start pulling drives.\n2. Power the node down. Backplane cabling is not a hot-swap operation.\n3. Reseat the backplane power and sideband connectors at both the backplane and board ends.\n4. Power on and confirm the bank enumerates.\n5. If the bank is still missing with cabling confirmed good, replace the backplane.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "CPU",
+    "error_code": "CPU_IERR",
+    "fault_description": "Internal error asserted by a processor. The node halts immediately and the BMC captures a screen image at the point of failure.",
+    "affected_parts": "SC-CP9480 processor; SC-MB2200 system board socket",
+    "root_cause": "An uncorrectable internal processor error. Most often the processor itself; occasionally a socket seating or contact problem presenting as an internal fault.",
+    "solution": "1. Collect the full log bundle including the IERR screen capture before rebooting — that capture is the primary evidence and does not survive a reboot.\n2. Note which socket asserted from the SEL entry.\n3. Power down, reseat the implicated processor, inspect the socket for bent or contaminated pins.\n4. Reapply thermal interface material and retorque the heatsink to the documented pattern.\n5. If IERR recurs after a clean reseat, replace the processor. If it follows the socket rather than the processor, replace the board.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "CPU",
+    "error_code": "CPU_CATERR",
+    "fault_description": "Catastrophic error signal asserted. The node halts hard, usually with no OS-side log entry.",
+    "affected_parts": "SC-CP9480 processor; SC-MB2200 system board",
+    "root_cause": "A processor or chipset-level fatal condition. Can also be triggered by a marginal VR rail rather than by the processor itself.",
+    "solution": "1. Capture the SEL and the CATERR screen image before any power cycle.\n2. Check whether a VR or rail fault was logged in the same second — if so, treat this as a power fault, not a CPU fault.\n3. With no rail event, reseat the processor and retest.\n4. Update BIOS and BMC firmware to the current qualified level; several CATERR signatures are firmware-addressable.\n5. Replace the processor if CATERR recurs on the same socket after reseat and firmware update.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "ECC_CE_THRESH",
+    "fault_description": "Correctable ECC error rate on one DIMM crosses the logging threshold. The node stays up and the OS continues to correct.",
+    "affected_parts": "SC-DR64G 64GB DDR5-5600 RDIMM; DIMM slot contacts",
+    "root_cause": "A degrading memory device, or a marginal slot contact. Correctable errors clustering on one DIMM point at the module; errors spread across a whole channel point at the slot or the controller.",
+    "solution": "1. Read the per-DIMM counters: `edac-util -s` and `ipmitool sel list | grep -i memory`.\n2. Map the reporting DIMM to a physical slot with `dmidecode -t memory`.\n3. If errors cluster on one module, replace that DIMM.\n4. If errors are spread across a channel, reseat every DIMM on that channel and clean the contacts before replacing anything.\n5. Clear counters and monitor for 24h under load before closing.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "ECC_UCE",
+    "fault_description": "Uncorrectable ECC error. The node panics or resets; the BMC records the failing DIMM location.",
+    "affected_parts": "SC-DR64G RDIMM; SC-MB2200 system board memory controller",
+    "root_cause": "A hard fault in the memory device. A whole-channel or whole-controller pattern instead points at the processor's integrated memory controller or the board.",
+    "solution": "1. Record the DIMM location from the SEL before rebooting.\n2. Replace the identified DIMM — an uncorrectable error is not a reseat candidate.\n3. Run a full memory test pass before returning the node to service.\n4. If uncorrectable errors follow the slot rather than the module, escalate to board replacement.\n5. Two or more DIMMs failing on the same channel in a short window means the controller, not the modules.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "SMART_197",
+    "fault_description": "SMART attribute 197 (Current Pending Sector Count) is non-zero and climbing on a SAS drive.",
+    "affected_parts": "SC-HD18T 18TB SAS 7.2K LFF drive",
+    "root_cause": "Sectors that failed a read and are awaiting reallocation. A climbing pending count reliably precedes user-visible data errors.",
+    "solution": "1. Capture full SMART data: `smartctl -a /dev/sdX`.\n2. Read attribute 197 together with 5 (Reallocated Sectors) and 198 (Offline Uncorrectable) — the three together tell you whether the drive is degrading or already failed.\n3. A non-zero, climbing 197 is a replacement, not a watch item.\n4. Confirm the array has rebuilt or the data is otherwise protected before pulling the drive.\n5. Hot-swap the drive and verify the rebuild starts.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "NVME_MEDIA_ERR",
+    "fault_description": "NVMe drive reports media and data integrity errors in its SMART log. The OS logs I/O errors against the device.",
+    "affected_parts": "SC-NV7T6 7.68TB U.2 NVMe drive; SC-BP24N backplane bay",
+    "root_cause": "NAND media degradation, or a marginal U.2 connector. A drive that clears after reseating was a connector problem; one that does not is a media problem.",
+    "solution": "1. Read the controller's own log: `nvme smart-log /dev/nvmeXn1`.\n2. Check the media error count together with percentage used and available spare.\n3. Reseat the drive once and re-read the log — a connector fault clears, a media fault does not.\n4. Replace if media errors persist or available spare is below threshold.\n5. Confirm the replacement enumerates at full PCIe link width before closing.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "BATT_P3V_RTC_LOW",
+    "fault_description": "RTC battery voltage below threshold. System time drifts and BIOS settings are lost across AC removal.",
+    "affected_parts": "CR2032 RTC cell; SC-MB2200 system board",
+    "root_cause": "A depleted RTC coin cell. Expected wear, not a fault, on nodes in service beyond a few years.",
+    "solution": "1. Confirm with `ipmitool sensor list | grep -i batt` — the reading will be below 2.7V.\n2. Power down and remove AC. This is not a hot-swap operation.\n3. Replace the coin cell, observing polarity.\n4. Power on, enter BIOS setup, reapply the site's boot and power-restore settings, and set the clock.\n5. Confirm settings persist across a full AC removal before closing.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "BIOS",
+    "error_code": "CMOS_CHECKSUM",
+    "fault_description": "CMOS checksum error on POST. BIOS settings revert to defaults and the node may boot to the wrong device.",
+    "affected_parts": "SC-MB2200 system board; RTC battery",
+    "root_cause": "A depleted RTC battery, an interrupted BIOS update, or a corrupted NVRAM region.",
+    "solution": "1. Check RTC battery voltage first — a flat cell is the common cause and the cheap fix.\n2. Replace the cell if low, then reapply BIOS settings.\n3. If the battery is healthy, load setup defaults, save, and power-cycle fully.\n4. If the checksum error returns with a good battery, reflash BIOS at the qualified level.\n5. Persistent corruption after a clean reflash means board replacement.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "BIOS",
+    "error_code": "POST_0xB2",
+    "fault_description": "POST halts at code 0xB2 with no video output. Fans spin at full speed and the node never reaches boot device selection.",
+    "affected_parts": "SC-DR64G RDIMM; SC-CP9480 processor; SC-MB2200 system board",
+    "root_cause": "Memory training failure. The memory reference code could not train one or more channels, most often because of a DIMM population error or a failed module.",
+    "solution": "1. Read the POST code from the BMC rather than from the board LEDs — it is retained after the halt.\n2. Verify the DIMM population matches the documented order for the platform. Wrong population is the most common cause of this halt.\n3. Boot with a single DIMM in the first slot of the first channel to confirm the node trains at all.\n4. Add DIMMs back a channel at a time to isolate the failing module or slot.\n5. Clear CMOS before concluding the board is at fault — a stale training profile can reproduce this.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Firmware",
+    "error_code": "BMC_UNRESPONSIVE",
+    "fault_description": "BMC stops answering on the management network and the web interface times out. The host OS keeps running normally.",
+    "affected_parts": "CoreBMC management controller; SC-MB2200 system board",
+    "root_cause": "A hung BMC firmware task. The host is unaffected because the BMC is out-of-band — this is a management-plane fault, not a host fault.",
+    "solution": "1. Try an in-band cold reset first: `ipmitool mc reset cold` from the host OS.\n2. If in-band access is also dead, remove AC for 60s — BMC standby power must be fully drained for the controller to reinitialise.\n3. Confirm the BMC reaches its login page and the SEL is intact after recovery.\n4. Update BMC firmware to the qualified level if the hang has recurred.\n5. Repeated hangs at the current firmware level warrant board replacement.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  },
+  {
+    "category": "Firmware",
+    "error_code": "BMC_FW_MISMATCH",
+    "fault_description": "BMC, BIOS and CPLD firmware are at levels that are not qualified together. Symptoms are inconsistent: spurious sensor readings, missing SEL entries, or sensors that never assert.",
+    "affected_parts": "CoreBMC firmware; BIOS; CPLD",
+    "root_cause": "A partial firmware update — one component updated, the others left behind. Sensor thresholds and SEL decoding are defined across the firmware set, so a mismatch produces misleading telemetry.",
+    "solution": "1. Record all three versions: `ipmitool mc info`, `dmidecode -t bios`, and the CPLD version from the log bundle.\n2. Check the set against the platform's qualified firmware matrix.\n3. Update in the documented order. Order matters — BMC before BIOS on SC platforms.\n4. Perform a full AC power cycle after the set is complete, not a warm reboot.\n5. Re-read sensors and confirm the telemetry is now consistent before trusting any earlier fault report from this node.",
+    "source": "Demo dataset — confirmed solutions (synthetic)"
+  }
+]

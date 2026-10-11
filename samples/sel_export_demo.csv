@@ -1,0 +1,11 @@
+ID,Timestamp,SensorType,SensorName,EventDescription,Severity
+1,2026-08-14 02:11:07,Temperature,Inlet_Temp,Upper critical threshold crossed,Critical
+2,2026-08-14 02:11:09,Fan,FAN3_R,Lower non-recoverable threshold crossed,Critical
+3,2026-08-14 02:11:09,Fan,FAN3_F,Lower critical threshold crossed,Warning
+4,2026-08-14 02:12:40,Processor,CPU0_Status,Thermal trip - system shutdown,Critical
+5,2026-08-14 02:41:18,System,BMC_Status,System power on,Info
+6,2026-08-14 02:41:55,Fan,FAN3_R,Sensor returned to normal range,Info
+7,2026-08-19 17:03:22,Memory,DIMM_CPU0_C0,Correctable ECC error,Warning
+8,2026-08-19 19:44:51,Memory,DIMM_CPU0_C0,Correctable ECC error,Warning
+9,2026-08-20 04:15:02,Memory,DIMM_CPU0_C0,Correctable ECC logging limit reached,Critical
+10,2026-08-22 08:30:11,PowerSupply,PSU1_Status,Predictive failure asserted,Warning

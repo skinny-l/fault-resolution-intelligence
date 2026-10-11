@@ -1,0 +1,17 @@
+[1842910.442117] SC-XA400: accelerator module 5 (0000:cb:00.0) temperature 89C
+[1842910.442199] SC-XA400: module 5 entering thermal slowdown, clocks capped
+[1843044.118002] Xid (0000:cb:00.0): 233, uncontained ECC error, channel 6
+[1843044.118114] SC-XA400: module 5 marked unhealthy, workload terminated
+[1843044.331907] Xid (0000:cb:00.0): 219, reset required before further use
+[1843102.550418] pcieport 0000:c9:02.0: AER: Uncorrected (Fatal) error received
+[1843102.550522] pcieport 0000:c9:02.0: AER:   device [1d0f:9f42] error status/mask=00100000/00000000
+[1843102.550611] Xid (0000:cb:00.0): 212, accelerator has fallen off the bus
+[1843102.551204] SC-XA400: module 5 no longer present in enumeration
+[1843102.551880] SC-XA400: modules present after fault: 7 of 8
+
+Preceding BMC event, same second:
+  RAIL_P12V_XA_B_FAULT asserted, rail P12V_XA_B
+
+Note: the rail event and the Xid 212 share a timestamp. Per the power-fault
+error map this is an auxiliary power rail for modules 5-8, so the power path
+is the first thing to check, not the module.

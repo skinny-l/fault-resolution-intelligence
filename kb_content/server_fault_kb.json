@@ -1,0 +1,263 @@
+[
+  {
+    "category": "Storage",
+    "error_code": "SAS_PHY_RESET",
+    "fault_description": "SAS PHY reset storm logged against one drive bay. The drive drops and re-enumerates repeatedly.",
+    "affected_parts": "SC-HD18T SAS drive; SC-BP24N backplane; SC-RC940 RAID controller",
+    "root_cause": "A marginal PHY link, usually from a contaminated or worn backplane connector, sometimes from a failing drive's own SAS interface.",
+    "solution": "1. Identify the bay from the controller log: `storcli /c0 show events`.\n2. Move the suspect drive to a known-good bay. If the resets follow the drive, replace the drive; if they stay with the bay, the backplane is at fault.\n3. Inspect and clean the bay connector.\n4. Replace the backplane if resets persist with a known-good drive.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "RAID_PD_FAILED",
+    "fault_description": "RAID controller marks a physical drive failed and the virtual drive enters degraded state.",
+    "affected_parts": "SC-HD18T SAS drive; SC-RC940 RAID controller",
+    "root_cause": "The drive exceeded the controller's error threshold. Occasionally a controller-side false positive after a transient bus event.",
+    "solution": "1. Confirm the failure in the controller: `storcli /c0 /eall /sall show`.\n2. Read the drive's own SMART data before accepting the controller's verdict — a drive with clean SMART that was failed after a bus event may be recoverable.\n3. Replace the drive and confirm the rebuild starts and progresses.\n4. Do not pull a second drive from a degraded array under any circumstances.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "BADSECTOR_PENDING",
+    "fault_description": "Filesystem reports read errors on specific blocks while the drive still reports itself healthy overall.",
+    "affected_parts": "SC-HD18T SAS drive; SC-NV7T6 NVMe drive",
+    "root_cause": "Localised media defects that have not yet crossed the drive's own failure threshold.",
+    "solution": "1. Run a long self-test: `smartctl -t long /dev/sdX`, then read the result.\n2. Correlate the reported LBA with the filesystem errors.\n3. Any confirmed uncorrectable read is a replacement — the drive's overall health verdict is not the deciding factor.\n4. Verify data protection before pulling.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Storage",
+    "error_code": "NVME_LINK_DEGRADED",
+    "fault_description": "NVMe drive enumerates but negotiates a narrower or slower PCIe link than expected. Throughput is well below spec.",
+    "affected_parts": "SC-NV7T6 NVMe drive; SC-BP24N backplane; SC-RS16X riser",
+    "root_cause": "A partially seated drive, a contaminated U.2 connector, or a degraded riser lane.",
+    "solution": "1. Check the negotiated link: `lspci -vv -s <bdf> | grep -i lnksta`.\n2. Compare against the capability line — a x4 drive reporting x2 is the signature.\n3. Reseat the drive and re-read. Most cases clear here.\n4. If the bay consistently degrades any drive, replace the backplane; if a whole riser's bays degrade, replace the riser.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "DIMM_TRAINING_FAIL",
+    "fault_description": "One DIMM fails memory training and is mapped out. The node boots with reduced capacity.",
+    "affected_parts": "SC-DR64G RDIMM; SC-MB2200 system board DIMM slot",
+    "root_cause": "A failed module, a bent slot contact, or debris in the slot.",
+    "solution": "1. Identify the mapped-out slot from the BMC event and confirm with `dmidecode -t memory`.\n2. Move the DIMM to a known-good slot. If it trains there, the original slot is at fault.\n3. Inspect the suspect slot under good light for bent or displaced contacts.\n4. Replace the DIMM if it fails in a known-good slot; escalate to board replacement if the slot is damaged.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "EDAC_CE_RATE",
+    "fault_description": "EDAC reports a sustained correctable error rate across one memory channel rather than one module.",
+    "affected_parts": "SC-DR64G RDIMM (whole channel); SC-CP9480 integrated memory controller",
+    "root_cause": "A channel-wide pattern points at the memory controller or the board trace, not at any single module.",
+    "solution": "1. Read per-channel counters with `edac-util -s`.\n2. Confirm the pattern is channel-wide rather than concentrated on one DIMM — this is the distinction that decides the whole repair path.\n3. Reseat every module on the channel and retest before replacing anything.\n4. If the rate persists with all modules swapped out, the controller or board is at fault.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Memory",
+    "error_code": "DIMM_THERMAL_THROTTLE",
+    "fault_description": "Memory thermal throttling asserted. Memory bandwidth drops sharply under sustained load.",
+    "affected_parts": "SC-DR64G RDIMM; SC-FN80D fan module; air baffle",
+    "root_cause": "Restricted airflow over the DIMM banks — most often a missing or misfitted air baffle, or a failed fan upstream.",
+    "solution": "1. Read DIMM temperatures: `ipmitool sensor list | grep -i dimm`.\n2. Check the air baffle is present and correctly seated. A missing baffle is the most common cause and costs nothing to fix.\n3. Verify all fans are running and no module has lost a rotor.\n4. Check inlet temperature — if the whole node is running hot, this is a facilities problem.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "CPU",
+    "error_code": "CPU_MCE_BANK4",
+    "fault_description": "Machine check exception logged against a processor cache bank. The node may survive or may panic depending on severity.",
+    "affected_parts": "SC-CP9480 processor",
+    "root_cause": "An uncorrectable cache error within the processor. Not a serviceable sub-component.",
+    "solution": "1. Decode the MCE: `mcelog --client` and cross-reference the kernel log.\n2. Note which socket and bank. Repeated MCEs on the same bank are conclusive.\n3. Update BIOS microcode to the qualified level — some MCE signatures are microcode-addressable.\n4. Replace the processor if MCEs recur after the microcode update.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "CPU",
+    "error_code": "UPI_LINK_DOWN",
+    "fault_description": "An inter-socket link fails to train or drops at runtime. The node either boots single-socket or panics.",
+    "affected_parts": "SC-CP9480 processor; SC-MB2200 system board",
+    "root_cause": "A seating or contact problem on one of the two sockets, or board trace damage between them.",
+    "solution": "1. Record which link and which sockets from the SEL.\n2. Power down and reseat both processors — an inter-socket link fault can originate at either end.\n3. Inspect both sockets for bent pins.\n4. If the link still fails to train with both processors known good, replace the board.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "CPU",
+    "error_code": "CPU_THERMTRIP",
+    "fault_description": "Thermal trip asserted. The processor shut the node down to protect itself.",
+    "affected_parts": "SC-CP9480 processor; heatsink; thermal interface material; SC-FN80D fans",
+    "root_cause": "Heatsink contact failure — poorly applied thermal interface material, an under-torqued heatsink, or blocked airflow.",
+    "solution": "1. Do not simply power the node back on and hope. Establish why it overheated.\n2. Check fan health and inlet temperature first.\n3. Remove the heatsink and inspect the thermal interface coverage — patchy or dried-out material is the usual finding.\n4. Clean both surfaces, reapply material, and retorque to the documented cross pattern.\n5. Run a sustained load test and watch temperatures before returning to service.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "PSU_OUTPUT_OC",
+    "fault_description": "PSU asserts output overcurrent and shuts down. The node drops if the peer supply cannot carry the full load.",
+    "affected_parts": "SC-PS2000 power supply; SC-MB2200 system board; SC-XA400 accelerator modules",
+    "root_cause": "A genuine downstream short, or a failing PSU misreporting. Accelerator nodes draw close to supply limits, so a real overcurrent is plausible there.",
+    "solution": "1. Capture the SEL and the PSU's own fault history from the log bundle before removing AC.\n2. Attempt power-on with accelerators and risers removed. If it powers on cleanly, add them back one at a time.\n3. If minimum configuration also trips, swap the PSU with a known-good unit.\n4. A trip that follows a specific component is a component fault; one that stays with the slot is a PSU or board fault.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "PSU_FAN_FAIL",
+    "fault_description": "PSU internal fan failure reported. The supply is still delivering power but will derate or shut down as it heats.",
+    "affected_parts": "SC-PS2000 power supply",
+    "root_cause": "PSU internal fan wear. The fan is not separately serviceable.",
+    "solution": "1. Confirm which slot is asserting.\n2. Verify the peer PSU is healthy before removing anything.\n3. Hot-swap the affected supply — this is not a watch item, the unit will derate.\n4. Confirm the replacement shares load correctly.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Power",
+    "error_code": "PWR_GOOD_TIMEOUT",
+    "fault_description": "Power-good signal not asserted within the expected window. The node attempts power-on and immediately returns to standby.",
+    "affected_parts": "SC-MB2200 system board; SC-PS2000 power supply; SC-CP9480 processor",
+    "root_cause": "A rail failing to come up in sequence. Can originate at the supply, the board VRs, or a processor preventing the sequence from completing.",
+    "solution": "1. Read the failing sequence step from the BMC log — it names the rail that did not come up.\n2. Remove AC for 60s and retry; a stuck sequencer often clears.\n3. Retry at minimum configuration.\n4. Substitute a known-good PSU before condemning the board.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Thermal",
+    "error_code": "INLET_TEMP_HIGH",
+    "fault_description": "Inlet temperature above threshold. Fans run at maximum and the node may throttle.",
+    "affected_parts": "Chassis inlet sensor; rack airflow; facility cooling",
+    "root_cause": "An environmental condition, not a node fault — a blocked inlet, missing blanking panels, hot-aisle recirculation, or a cooling failure in the hall.",
+    "solution": "1. Read the inlet sensor and compare against neighbouring nodes in the same rack.\n2. If neighbours read the same, this is a facilities issue — escalate rather than touching the node.\n3. If only this node is hot, check for a blocked inlet, missing blanking panels, or a cable obstruction.\n4. Replace the inlet sensor only when the reading is inconsistent with a physical measurement at the inlet.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Thermal",
+    "error_code": "EXHAUST_TEMP_HIGH",
+    "fault_description": "Exhaust temperature high with inlet temperature normal. The node is not shedding heat.",
+    "affected_parts": "SC-FN80D fan modules; air baffle; heatsinks; SC-XA400 accelerator modules",
+    "root_cause": "Reduced airflow through the chassis or an unusually high internal heat load.",
+    "solution": "1. Confirm inlet is normal — that is what distinguishes this from a facilities problem.\n2. Check every fan is present and both rotors running.\n3. Verify the air baffle and all blanking panels are fitted. An open bay short-circuits chassis airflow.\n4. On accelerator nodes, check per-module temperatures for one module running far hotter than its peers.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Network",
+    "error_code": "NIC_LINK_FLAP",
+    "fault_description": "Network interface repeatedly loses and regains link. Traffic is disrupted in bursts.",
+    "affected_parts": "SC-NX200 OCP adapter; optical transceiver; fibre patch lead; switch port",
+    "root_cause": "A marginal optical link — a dirty or damaged connector, a failing transceiver, or a switch-side port fault. The adapter itself is the least likely cause.",
+    "solution": "1. Read the interface counters and link history: `ethtool ethX` and `dmesg | grep -i link`.\n2. Read transceiver diagnostics: `ethtool -m ethX`. Low receive power points at the fibre path.\n3. Clean both fibre end faces before replacing anything — contamination is the single most common cause.\n4. Swap the transceiver, then the patch lead, then move to a different switch port, in that order.\n5. Replace the adapter only after the fibre path and switch port are eliminated.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Network",
+    "error_code": "OCP_PRESENCE_LOST",
+    "fault_description": "OCP adapter no longer detected. The interface disappears from the OS and the BMC inventory.",
+    "affected_parts": "SC-NX200 OCP adapter; OCP slot on SC-MB2200",
+    "root_cause": "A partially seated adapter or a failed slot.",
+    "solution": "1. Confirm absence from PCIe enumeration: `lspci | grep -i ether`.\n2. Power down — OCP 3.0 slots on SC platforms are not hot-swap.\n3. Reseat the adapter fully until the latch engages.\n4. If a known-good adapter is also not detected, the slot or board is at fault.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Network",
+    "error_code": "PCIE_CE_RATE",
+    "fault_description": "PCIe correctable error rate above threshold on one device. Throughput may be reduced; the device stays functional.",
+    "affected_parts": "SC-RS16X riser; SC-NX200 adapter; SC-MB2200 system board",
+    "root_cause": "Signal integrity degradation on the link — a marginal riser connection or a contaminated slot.",
+    "solution": "1. Read AER counters from the kernel log and confirm they are correctable, not fatal.\n2. Note the negotiated link width and speed.\n3. Reseat the device and its riser.\n4. Move the device to another slot. If errors follow the device, replace it; if they stay with the slot, replace the riser.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Network",
+    "error_code": "PCIE_UE_FATAL",
+    "fault_description": "Fatal PCIe uncorrectable error. The device drops off the bus and the node may panic.",
+    "affected_parts": "SC-RS16X riser; SC-NX200 adapter; SC-XA400 accelerator module",
+    "root_cause": "A hard link failure — a failed device, a failed riser, or a power delivery problem on the slot.",
+    "solution": "1. Capture the full AER decode and the SEL before rebooting.\n2. Check whether a rail event was logged at the same time. If so, treat as a power fault first.\n3. Reseat the device and riser.\n4. Swap the device to another slot to determine whether the fault follows the device or the slot.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "BIOS",
+    "error_code": "BOOT_NO_MEDIA",
+    "fault_description": "No bootable media found. The node reaches boot device selection and stops.",
+    "affected_parts": "Boot drive; SC-RC940 RAID controller; BIOS boot order",
+    "root_cause": "A lost boot order after a CMOS clear, a failed boot drive, or a degraded boot array.",
+    "solution": "1. Check whether the boot device enumerates at all in BIOS setup.\n2. If it enumerates, this is a boot order problem — reapply the site's boot configuration.\n3. If it does not, check the controller for a failed or foreign-state drive.\n4. Check RTC battery health — a flat cell loses boot order repeatedly and is the real fix.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "BIOS",
+    "error_code": "POST_0xA9",
+    "fault_description": "POST halts at code 0xA9 during PCIe enumeration. No video, no boot.",
+    "affected_parts": "SC-RS16X riser; SC-XA400 accelerator module; SC-NX200 adapter",
+    "root_cause": "A PCIe device preventing enumeration from completing — a failed device or a riser fault.",
+    "solution": "1. Read the POST code from the BMC.\n2. Remove all PCIe devices and risers, then power on. Reaching POST confirms a device is at fault.\n3. Add devices back one at a time until the halt reproduces.\n4. Replace the identified device or riser.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "BIOS",
+    "error_code": "BIOS_UPDATE_FAIL",
+    "fault_description": "BIOS update aborts partway. The node may fail to POST afterwards.",
+    "affected_parts": "BIOS flash; CoreBMC firmware",
+    "root_cause": "An interrupted update — usually a power event during the flash window, or an image that does not match the platform.",
+    "solution": "1. Do not power-cycle repeatedly. That risks corrupting a recovery image as well.\n2. Verify the image matches the exact platform SKU, not just the family.\n3. Use the BMC's out-of-band recovery flash rather than an in-band retry.\n4. If recovery flash also fails, the board needs replacement.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Firmware",
+    "error_code": "CPLD_VER_MISMATCH",
+    "fault_description": "CPLD version does not match the qualified set. Power sequencing or presence detection behaves inconsistently.",
+    "affected_parts": "CPLD on SC-MB2200; CoreBMC firmware",
+    "root_cause": "A partial firmware update. The CPLD drives power sequencing and presence detect, so a mismatch produces symptoms that look like hardware faults.",
+    "solution": "1. Read the CPLD version from the log bundle.\n2. Compare against the platform's qualified firmware matrix.\n3. Update the CPLD, then perform a full AC power cycle — a CPLD update does not take effect on a warm reboot.\n4. Re-verify any earlier presence or sequencing fault from this node; it may have been the mismatch all along.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Firmware",
+    "error_code": "SEL_FULL",
+    "fault_description": "System event log full. New events are dropped, so the node stops reporting faults.",
+    "affected_parts": "CoreBMC event log",
+    "root_cause": "The SEL was never cleared after previous events. Not a fault in itself, but it blinds you to real faults.",
+    "solution": "1. Export the full SEL before clearing — you are about to destroy the node's fault history.\n2. `ipmitool sel save` then `ipmitool sel clear`.\n3. Review the exported log for unaddressed faults.\n4. Add SEL capacity to routine monitoring so this does not recur.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Firmware",
+    "error_code": "BMC_SENSOR_STALE",
+    "fault_description": "One or more BMC sensors report a fixed value or no reading at all, while the hardware is demonstrably fine.",
+    "affected_parts": "CoreBMC firmware; sensor cabling",
+    "root_cause": "A stalled sensor polling task, a firmware mismatch, or a disconnected sensor lead.",
+    "solution": "1. Cold-reset the BMC: `ipmitool mc reset cold`. Most stale sensors clear here.\n2. Re-read the sensor and confirm it tracks a real change.\n3. Check the firmware set is qualified together — mismatches commonly present this way.\n4. Do not act on a stale sensor's reading. Confirm any fault it reports by another means first.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "RISER_LINK_DEGRADED",
+    "fault_description": "Every device behind one riser negotiates a degraded link, or the riser's devices disappear entirely.",
+    "affected_parts": "SC-RS16X riser; riser slot on SC-MB2200",
+    "root_cause": "A partially seated or failed riser. A whole riser's worth of devices behaving badly at once is the distinguishing signature.",
+    "solution": "1. Check link status for every device behind the riser. A common pattern across all of them points at the riser.\n2. Power down and reseat the riser fully.\n3. Inspect the riser's board-edge connector for contamination or damage.\n4. Replace the riser; replace the board only if a known-good riser also degrades.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "CHASSIS_INTRUSION",
+    "fault_description": "Chassis intrusion asserted. Logged as a security event.",
+    "affected_parts": "Chassis intrusion switch; top cover",
+    "root_cause": "A cover that was opened for service, or an intrusion switch not making contact because the cover is not fully seated.",
+    "solution": "1. Confirm the cover is fully closed and latched.\n2. Clear the event and check whether it re-asserts.\n3. If it re-asserts with the cover closed, the switch or its lead is at fault.\n4. Correlate against the maintenance record before treating it as a genuine security event.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "Board",
+    "error_code": "FRU_READ_FAIL",
+    "fault_description": "FRU inventory read fails. Model and serial fields come back empty or corrupted in the BMC inventory.",
+    "affected_parts": "FRU EEPROM on SC-MB2200; CoreBMC firmware",
+    "root_cause": "A corrupted FRU EEPROM, or a BMC unable to complete the read.",
+    "solution": "1. Attempt the read directly: `ipmitool fru print`.\n2. Cold-reset the BMC and retry — a transient read failure clears here.\n3. If the read consistently fails, the EEPROM is corrupt.\n4. A node with an unreadable FRU cannot be reliably inventoried; flag it for board replacement rather than leaving it in service unidentified.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  },
+  {
+    "category": "System",
+    "error_code": "UNEXPECTED_REBOOT",
+    "fault_description": "Node rebooted with no OS-side shutdown record and no obvious hardware event.",
+    "affected_parts": "SC-MB2200 system board; SC-PS2000 power supply; CoreBMC firmware",
+    "root_cause": "Could be a power event, a watchdog expiry, an uncaught MCE, or an upstream facility event. The SEL timestamp is what separates them.",
+    "solution": "1. Read the SEL and find the last event before the reboot. That timestamp is the whole investigation.\n2. Check for AC loss events on either PSU — an upstream power event looks exactly like a crash from inside the OS.\n3. Check for watchdog expiry, which points at a hung host rather than a hardware fault.\n4. Check for an MCE or IERR immediately before the reset.\n5. With a genuinely empty SEL, look upstream at the rack before suspecting the node.",
+    "source": "Demo dataset — general fault KB (synthetic)"
+  }
+]

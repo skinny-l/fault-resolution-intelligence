@@ -1,0 +1,629 @@
+"""Tests for FIARS: dispatch table parsing and merge into parsed jobs."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from fiars.parser import parse_ticket, parse_multi_ticket, infer_category
+from fiars.parser_table import parse_dispatch_table, merge_dispatch, extract_shift_banner
+from fiars.report import default_draft, build_report, build_combined_report
+from tests.sample_tickets import (
+    HDD_TICKET, HDD_TICKET_NUMBER,
+    DISPATCH_ROW_HDD, DISPATCH_TABLE_TWO_PARTS,
+    MB_TICKET, MB_TICKET_NUMBER, DISPATCH_TABLE_MB_PLUS_MEMORY,
+    GPU_TWO_BLOCK_TICKET, GPU_TICKET_NUMBER, DISPATCH_ROW_GPU_SINGLE,
+    RAM_X2_TICKET, RAM_X2_TICKET_NUMBER, DISPATCH_TABLE_RAM_X2_PLUS_MB_NIC,
+)
+
+# Real dispatch table sample where two rows carry an extra trailing line
+# after Engineer (PCIe address/slot + serial), which used to desync every
+# row parsed after them under fixed-width chunking.
+DISPATCH_TABLE_GPU_VARIABLE_ROWS = """Date
+Ticket No#
+Case ID#
+Server SN
+Rack Info
+Faulty Part
+OLD PN
+NEW PN
+Maker
+Model
+Engineer
+26/6/2026
+TKTA0000000011
+TKTB0000000008
+2KX100011
+TESTDC1_B1_DH2A-B-10-1
+GPU A100 PCIE - SPEX2026062500003
+X0170AD0000004ZY
+Onsite run test to confirm
+A
+SC-4800G
+Sahir
+GPU6 SN: 1323622026394
+6/7/2026
+TKTA0000000012
+TKTB0000000010
+2KX100012
+TESTDC1_B1_DH2A-A-10-11
+GPU A100 PCIE - SPEX2026070500043
+0000:9b:00.0 SN:1323622026318
+customer provide parts
+A
+SC-4800G
+Jordan | Casey | Alex"""
+
+
+def test_infer_category_gpu_beats_pcie_network_collision():
+    # "PCIE" is also a Network keyword — GPU must win for GPU faults.
+    assert infer_category("GPU A100 PCIE - SPEX2026062500003") == "GPU"
+
+
+def test_parse_row_with_extra_trailing_line_does_not_desync_next_row():
+    rows = parse_dispatch_table(DISPATCH_TABLE_GPU_VARIABLE_ROWS)
+    assert len(rows) == 2
+    assert rows[0]["ticket_no"] == "TKTA0000000011"
+    assert rows[0]["server_sn"] == "2KX100011"
+    assert rows[0]["category"] == "GPU"
+    assert "GPU6 SN" in rows[0]["engineer"]
+    # Second row must start clean — this is what broke before the fix.
+    assert rows[1]["ticket_no"] == "TKTA0000000012"
+    assert rows[1]["server_sn"] == "2KX100012"
+    assert rows[1]["old_pn"] == "0000:9b:00.0 SN:1323622026318"
+
+
+def test_parse_single_row():
+    rows = parse_dispatch_table(DISPATCH_ROW_HDD)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["ticket_no"] == "TKTA0000000004"
+    assert row["server_sn"] == "DSN000003"
+    assert row["old_pn"] == "PN-DEMO-0010"
+    assert row["new_pn"] == "PN-DEMO-0012"
+    assert row["category"] == "Storage"
+
+
+def test_parse_multi_row_same_ticket():
+    rows = parse_dispatch_table(DISPATCH_TABLE_TWO_PARTS)
+    assert len(rows) == 2
+    assert all(r["ticket_no"] == "TKTA0000000005" for r in rows)
+    assert all(r["server_sn"] == "DSN000007" for r in rows)
+    cats = {r["category"] for r in rows}
+    assert cats == {"Board", "Memory"}
+
+
+def test_parse_ignores_shift_banner_preamble():
+    banner = "Taylor | Riley | Alex – SITE-A @ 9:30 am\n" + DISPATCH_ROW_HDD
+    rows = parse_dispatch_table(banner)
+    assert len(rows) == 1
+    assert rows[0]["server_sn"] == "DSN000003"
+
+
+def test_merge_overrides_ticket_number_and_fills_pn():
+    job = parse_ticket(HDD_TICKET, HDD_TICKET_NUMBER)
+    assert job["ticket_number"] == HDD_TICKET_NUMBER  # manually-typed, before merge
+    rows = parse_dispatch_table(DISPATCH_ROW_HDD)
+    merge_dispatch([job], rows)
+    assert job["ticket_number"] == "TKTA0000000004"   # dispatch table wins
+    assert job["part"]["old_pn"] == "PN-DEMO-0010"
+    assert job["part"]["new_pn"] == "PN-DEMO-0012"
+    assert job["dispatch_matched"] is True
+
+
+def test_merge_disambiguates_two_parts_by_category():
+    # Same server SN, two categories — must not cross-match.
+    board_job = {"server_sn": "DSN000007", "category": "Board", "part": {}}
+    memory_job = {"server_sn": "DSN000007", "category": "Memory", "part": {}}
+    rows = parse_dispatch_table(DISPATCH_TABLE_TWO_PARTS)
+    merge_dispatch([board_job, memory_job], rows)
+    assert board_job["part"]["old_pn"] == "YZMB-02666-106"
+    assert board_job["part"]["new_pn"] == "YZMB-02666-106 borrow"
+    assert memory_job["part"]["old_pn"] == "PN-DEMO-0007"
+    assert memory_job["part"]["new_pn"] == "PN-DEMO-0007"
+
+
+def test_merge_no_match_leaves_job_untouched():
+    job = parse_ticket(HDD_TICKET, HDD_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_TABLE_TWO_PARTS)  # different SN entirely
+    merge_dispatch([job], rows)
+    assert job["ticket_number"] == HDD_TICKET_NUMBER  # untouched, no fabricated match
+    assert job["dispatch_matched"] is False
+
+
+def test_engineer_and_case_id_not_merged_into_job():
+    job = parse_ticket(HDD_TICKET, HDD_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_ROW_HDD)
+    merge_dispatch([job], rows)
+    assert "engineer" not in job
+    assert "case_id" not in job
+
+
+def test_maker_model_stored_as_metadata_not_part_fields():
+    job = parse_ticket(HDD_TICKET, HDD_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_ROW_HDD)
+    merge_dispatch([job], rows)
+    assert job["server_model_code"] == "Q MPN-DEMO-0001"
+    assert job["part"].get("model") != "Q MPN-DEMO-0001"
+
+
+def test_end_to_end_report_reflects_dispatch_merge():
+    job = parse_ticket(HDD_TICKET, HDD_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_ROW_HDD)
+    merge_dispatch([job], rows)
+    draft = default_draft(job)
+    report = build_report(draft)
+    assert "Ticket Number: TKTA0000000004" in report
+    assert "PN: PN-DEMO-0010" in report
+    assert "PN: PN-DEMO-0012" in report
+
+
+def test_merge_attaches_unconsumed_row_as_extra_part():
+    # ONE job (one fault block), but TWO dispatch rows for the same ticket
+    # (Memory + Motherboard) — the leftover row must not be dropped.
+    job = parse_ticket(MB_TICKET, MB_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_TABLE_MB_PLUS_MEMORY)
+    merge_dispatch([job], rows)
+    assert job["dispatch_matched"] is True
+    # Primary part (matched by category = Memory, since fault_type is Memory)
+    assert job["part"]["old_pn"] == "PN-DEMO-0005"
+    assert job["part"]["new_pn"] == "PN-DEMO-0005"
+    # Leftover Motherboard row preserved, not discarded
+    assert len(job["extra_parts"]) == 1
+    assert job["extra_parts"][0]["old_pn"] == "YZMB-03296-10F"
+    assert job["extra_parts"][0]["new_pn"] == "YZMB-03296-10F"
+
+
+def test_draft_and_report_combine_both_parts_into_one_report():
+    job = parse_ticket(MB_TICKET, MB_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_TABLE_MB_PLUS_MEMORY)
+    merge_dispatch([job], rows)
+    draft = default_draft(job)
+    report = build_report(draft)
+
+    # Single header, not duplicated
+    assert report.count("Ticket Number:") == 1
+    assert report.count("Server SN:") == 1
+    assert report.count("Location:") == 1
+    assert "Ticket Number: TKTA0000000006" in report
+
+    # Both PNs present in the one report
+    assert "PN-DEMO-0005" in report
+    assert "YZMB-03296-10F" in report
+
+    # Extra block titled by its own part type, not the primary "part_kind"
+    assert "Old Motherboard" in report
+    assert "New Motherboard" in report
+
+    # Single Remark at the end, not one per part
+    assert report.count("Remark:") == 1
+
+
+def test_infer_category_dram_does_not_false_match_ram():
+    # "DRAM"/"DRAMUncorrectable" must not trip the Memory "ram" keyword —
+    # this is GPU on-die memory, not a DIMM. Regression for a substring
+    # match bug ("ram" matching inside "dram").
+    text = ("RemappedRows Pending:Yes,Volatile DRAMUncorrectable:2, "
+            "need to reset GPU or server.")
+    assert infer_category(text) == "GPU"
+
+
+def test_two_tags_blocks_same_ticket_combine_into_one_report():
+    # Two 工单标签/tags blocks (two distinct GPU Xid events), same ticket,
+    # same server SN, but only one dispatch row for that SN — must combine
+    # into a single note, not two fully separate block reports.
+    jobs = parse_multi_ticket(GPU_TWO_BLOCK_TICKET, GPU_TICKET_NUMBER)
+    assert len(jobs) == 2
+    rows = parse_dispatch_table(DISPATCH_ROW_GPU_SINGLE)
+    merge_dispatch(jobs, rows)
+    drafts = [default_draft(j) for j in jobs]
+    report = build_combined_report(drafts)
+
+    # Single shared header
+    assert report.count("Ticket Number:") == 1
+    assert report.count("Server SN:") == 1
+    assert report.count("Location:") == 1
+    assert "Ticket Number: TKTA0000000007" in report
+
+    # Slot lives on the block title now, not a repeated "Details: Replaced
+    # X (slot Y). Issue resolved." sentence per block. Details is a
+    # mandatory header field — shown exactly once for the whole combined
+    # ticket, blank here since neither draft was edited.
+    assert report.count("Details:") == 1
+    assert "\nDetails: \n" in report  # mandatory field, blank, no engineer edit
+    assert "(slot 37:00)" in report
+    assert "(slot 0000:37:00.0)" in report
+
+    # Both blocks' part data present
+    assert "0000:37:00.0 SN: 1000000000001" in report          # block 1, from dispatch
+    assert "900-21001-0020-100" in report                        # block 2, from ticket text
+
+    # Both blocks correctly titled GPU, not generic "Part" or wrong category
+    assert report.count("Old GPU") == 2
+    assert report.count("New GPU") == 2
+
+    # Single Remark at the end
+    assert report.count("Remark:") == 1
+
+
+def test_combined_report_has_single_quick_reference_line():
+    # The combined (multi-block, same ticket+server) report gets exactly
+    # ONE quick-reference first line, not one per block, taken from the
+    # first block's server SN + location.
+    jobs = parse_multi_ticket(GPU_TWO_BLOCK_TICKET, GPU_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_ROW_GPU_SINGLE)
+    merge_dispatch(jobs, rows)
+    drafts = [default_draft(j) for j in jobs]
+    report = build_combined_report(drafts)
+
+    lines = report.split("\n")
+    assert lines[0].startswith("2KX100003")
+    assert lines[0].count("2KX100003") == 1
+    assert lines[1] == ""
+    assert lines[2] == f"Date: {drafts[0]['date']}"
+
+
+def test_combined_report_does_not_merge_different_tickets():
+    # Different ticket numbers / server SNs must stay as separate reports
+    # even when passed through build_combined_report together.
+    job_a = parse_ticket(HDD_TICKET, HDD_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_ROW_HDD)
+    merge_dispatch([job_a], rows)
+    draft_a = default_draft(job_a)
+
+    board_job = {"server_sn": "DSN000007", "category": "Board", "part": {},
+                 "ticket_number": "TKTA0000000005", "location_full": "SOMEWHERE"}
+    draft_b = default_draft(board_job)
+
+    combined = build_combined_report([draft_a, draft_b])
+    assert combined.count("Ticket Number:") == 2
+    assert "TKTA0000000004" in combined
+    assert "TKTA0000000005" in combined
+
+
+def test_multi_unit_row_matches_each_same_category_job_without_being_exhausted():
+    # "Memory x2" is one dispatch row describing 2 identical DIMMs. Two
+    # separate RAM fault blocks on the same ticket must BOTH match this row
+    # (same PN) rather than the row being consumed after the first match.
+    jobs = parse_multi_ticket(RAM_X2_TICKET, RAM_X2_TICKET_NUMBER)
+    assert len(jobs) == 2
+    rows = parse_dispatch_table(DISPATCH_TABLE_RAM_X2_PLUS_MB_NIC)
+    merge_dispatch(jobs, rows)
+
+    for j in jobs:
+        assert j["dispatch_matched"] is True
+        assert j["part"]["dispatch_label"] == "Memory x2"
+        assert j["part"]["old_pn"] == "PN-DEMO-0006"
+        assert j["part"]["new_pn"] == "PN-DEMO-0006"
+
+    # Distinct physical DIMMs — their own SNs must NOT be mixed up between
+    # jobs (this was the actual reported bug: job 2's SN ended up paired
+    # with the Motherboard row's PN under a wrong "Motherboard" title).
+    sns = {j["part"]["sn"] for j in jobs}
+    assert sns == {"802C0F0000001AC", "802C0F0000002AE"}
+
+    # Motherboard + NIC had no fault-description block of their own, so
+    # both leftover rows land on the last job as extra_parts — not
+    # swallowed into job 2's own (RAM) primary block.
+    assert len(jobs[-1]["extra_parts"]) == 2
+    extra_pns = {ep["old_pn"] for ep in jobs[-1]["extra_parts"]}
+    assert extra_pns == {"YZMB-02666-106", "PN-DEMO-0009"}
+
+
+def test_multi_unit_row_report_never_mixes_ram_and_motherboard_fields():
+    jobs = parse_multi_ticket(RAM_X2_TICKET, RAM_X2_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_TABLE_RAM_X2_PLUS_MB_NIC)
+    merge_dispatch(jobs, rows)
+    drafts = [default_draft(j) for j in jobs]
+    report = build_combined_report(drafts)
+
+    # Both RAM blocks titled RAM, with RAM's own PN — never "Old Motherboard"
+    # wearing a RAM model/SN/MPN, which was the reported bug.
+    assert report.count("Old RAM") == 2
+    assert report.count("New RAM") == 2
+    assert "Old Motherboard" in report  # from extra_parts, correctly separate
+    assert "Old NIC" in report
+
+    # The Motherboard block (from extra_parts) must carry ONLY the
+    # motherboard PN — no RAM model/MPN/SN leaking into it.
+    mb_idx = report.index("Old Motherboard")
+    mb_block = report[mb_idx:mb_idx + 200]
+    assert "MTC40F2046S1RC56BD1" not in mb_block  # RAM's MPN
+    assert "SynthCore 64GB" not in mb_block           # RAM's model
+    assert "YZMB-02666-106" in mb_block
+
+
+def test_unit_count_never_matches_inside_unrelated_tokens():
+    # Regression: "GPU A100 PCIE - SPEX2026071100090" was misread as a
+    # unit-count marker ("x2026071100090" — the X in SPEX + the digits
+    # after it), which made merge_dispatch attempt a multi-trillion
+    # iteration loop and hang the whole process. A "X" immediately
+    # followed by digits must NOT count as "xN" unless it's a genuine
+    # standalone marker (word boundary before it, at most 2 digits).
+    from fiars.parser_table import _unit_count
+    assert _unit_count("GPU A100 PCIE - SPEX2026071100090") == 1
+    assert _unit_count("GPU H100 - SPEX2026071100080") == 1
+    assert _unit_count("Memory x2") == 2
+    assert _unit_count("Memory x10") == 10
+    assert _unit_count("Memory X3") == 3
+    assert _unit_count("Motherboard - high risk have bent pins") == 1
+
+
+def test_gpu_spex_dispatch_rows_do_not_hang_merge_dispatch():
+    # End-to-end regression for the SPEX-code hang: two GPU fault blocks
+    # (real Xid ECC report, same ticket) matched against a single-row
+    # dispatch table whose Faulty Part text contains a SPEX code. Must
+    # complete (and correctly categorize both blocks as GPU) instead of
+    # hanging on a runaway range() loop.
+    jobs = parse_multi_ticket(GPU_TWO_BLOCK_TICKET, GPU_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_ROW_GPU_SINGLE)
+    merge_dispatch(jobs, rows)  # must return promptly, not hang
+    assert jobs[0]["category"] == "GPU"
+    assert jobs[1]["category"] == "GPU"
+    drafts = [default_draft(j) for j in jobs]
+    report = build_combined_report(drafts)
+    assert report.count("Old GPU") == 2
+    assert "(slot 37:00)" in report
+    assert "(slot 0000:37:00.0)" in report
+
+
+def test_infer_category_gpu_ecc_outranks_ambiguous_memory_keyword():
+    # Regression: a GPU fault whose text contains both "ECC" (ambiguous —
+    # shared with Memory/DIMM errors) and "Xid"/"GPU" (unambiguous GPU
+    # signals) must resolve to GPU, not Memory. Previously Memory's "ecc"
+    # keyword won just because Memory was checked before GPU.
+    text_desc = ("diff:371;NVRM: Xid (PCI:0000:37:00): 95, pid=5171, "
+                 "Uncontained: FBHUB. RST: Yes, D-RST: No")
+    text_detail = "xid 95 Uncontained ECC error occurred"
+    assert infer_category("GPU", "", text_desc, text_detail) == "GPU"
+
+    # A genuine DIMM ECC error with no GPU signal must still be Memory.
+    assert infer_category("Memory", "", "Memory CE (Count) > Max (Kernel)",
+                           "ECC error on DIMM P1_C1_D0") == "Memory"
+
+
+def test_slot_appears_on_block_title_and_details_is_mandatory_blank():
+    # New format: "Old RAM (slot X)" / "New RAM (slot X)" instead of a
+    # "Details: Replaced RAM (slot X). Issue resolved." sentence. Details
+    # is a mandatory header field — always present exactly once, blank by
+    # default when the engineer hasn't written anything — the slot alone
+    # on the title carries the slot information.
+    job = parse_ticket(HDD_TICKET, HDD_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_ROW_HDD)
+    merge_dispatch([job], rows)
+    draft = default_draft(job)
+    assert draft["slot"] == "22"
+    assert draft["details"] == ""
+    report = build_report(draft)
+    assert "(slot 22)" in report
+    assert "Old HDD (slot 22)" in report
+    assert "New HDD (slot 22)" in report
+    assert report.count("Details:") == 1
+    assert "\nDetails: \n" in report
+
+
+def test_engineer_written_details_still_shown_without_slot_duplication():
+    job = parse_ticket(HDD_TICKET, HDD_TICKET_NUMBER)
+    rows = parse_dispatch_table(DISPATCH_ROW_HDD)
+    merge_dispatch([job], rows)
+    draft = default_draft(job)
+    draft["details"] = "Found bad sectors, replaced disk, rebuilt RAID. Issue resolved."
+    report = build_report(draft)
+    assert report.count("Details:") == 1
+    assert "Found bad sectors" in report
+    assert "Old HDD (slot 22)" in report  # slot still on title, not duplicated in Details
+
+
+def test_dispatch_table_parses_without_header_row():
+    # Engineer sometimes pastes just the data rows (a subset copied from a
+    # larger table) with no "Date / Ticket No# / ..." header line above
+    # them. Previously this returned zero rows silently (start-anchor
+    # search for a literal "Date" line found nothing, StopIteration ->
+    # `return []`). Same column order, header just absent.
+    headerless = """25/7/2026
+TKTA0000000013
+TKTB0000000011
+DSN000008
+TESTDC1_B1_DH3A-K-04-1
+Memory
+PN-DEMO-0004
+PN-DEMO-0003
+I
+SCH2400-D2-N48
+Alex Deliver onsite
+25/7/2026
+TKTA0000000014
+TKTB0000000012
+DSN000009
+TESTDC1_B2_DH1A-J-04-51
+Memory
+PN-DEMO-0002
+PN-DEMO-0001
+I
+SCH2400-D2-N48
+Alex Deliver onsite"""
+    rows = parse_dispatch_table(headerless)
+    assert len(rows) == 2
+    assert rows[0]["ticket_no"] == "TKTA0000000013"
+    assert rows[0]["server_sn"] == "DSN000008"
+    assert rows[0]["faulty_part"] == "Memory"
+    assert rows[0]["old_pn"] == "PN-DEMO-0004"
+    assert rows[0]["new_pn"] == "PN-DEMO-0003"
+    assert rows[1]["ticket_no"] == "TKTA0000000014"
+    assert rows[1]["server_sn"] == "DSN000009"
+
+
+def test_blank_cell_mid_row_does_not_shift_columns():
+    # A row with a genuinely empty cell (blank Case ID#) must not shift
+    # every field after it into the wrong column. This was the actual
+    # cause of the "sometimes" paste mismatches — blank lines used to be
+    # silently dropped, which desynced OLD PN/NEW PN/Maker/Model/Engineer
+    # by one position whenever any cell in a row was empty.
+    row_with_blank_cell = """Date
+Ticket No#
+Case ID#
+Server SN
+Rack Info
+Faulty Part
+OLD PN
+NEW PN
+Maker
+Model
+Engineer
+2/7/2026
+TKTA0000000004
+
+DSN000003
+TESTDC1_B4_DH1B-B-10-40
+Hard drive
+PN-DEMO-0010
+PN-DEMO-0012
+Q
+MPN-DEMO-0001
+Taylor Deliver onsite"""
+    rows = parse_dispatch_table(row_with_blank_cell)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["ticket_no"] == "TKTA0000000004"
+    assert row["case_id"] == ""
+    assert row["server_sn"] == "DSN000003"
+    assert row["old_pn"] == "PN-DEMO-0010"
+    assert row["new_pn"] == "PN-DEMO-0012"
+    assert row["maker"] == "Q"
+    assert row["model"] == "MPN-DEMO-0001"
+    assert row["engineer"] == "Taylor Deliver onsite"
+
+
+def test_blank_cell_in_second_row_does_not_shift_first_row():
+    # Same blank-cell case, but on the SECOND row of a two-row paste, to
+    # confirm row-boundary detection (anchored on the Date cell) isn't
+    # thrown off by an empty cell either.
+    two_rows_second_blank = DISPATCH_ROW_HDD + """
+2/8/2026
+TKTA0000000010
+TKTB0000000009
+DSN000102
+TESTDC1_B4_DH1B-B-11-41
+Memory
+
+PN-DEMO-0007
+Q
+MPN-DEMO-0001
+Taylor Deliver onsite"""
+    rows = parse_dispatch_table(two_rows_second_blank)
+    assert len(rows) == 2
+    assert rows[0]["server_sn"] == "DSN000003"  # first row unaffected
+    second = rows[1]
+    assert second["ticket_no"] == "TKTA0000000010"
+    assert second["old_pn"] == ""
+    assert second["new_pn"] == "PN-DEMO-0007"
+    assert second["maker"] == "Q"
+
+
+def test_leading_and_trailing_blank_lines_still_ignored():
+    padded = "\n\n" + DISPATCH_ROW_HDD + "\n\n\n"
+    rows = parse_dispatch_table(padded)
+    assert len(rows) == 1
+    assert rows[0]["server_sn"] == "DSN000003"
+
+
+def test_paragraph_separated_paste_does_not_shift_every_column():
+    # Some webmail/Outlook copies turn *every* cell into its own paragraph
+    # with a blank line after it, not just empty cells (Date, "", Ticket
+    # No#, "", Case ID#, "", ...). The blank-cell-preserving logic that
+    # fixed the single-blank-cell case reads each of these separators as
+    # "this cell is empty" and shifts every real value one column late —
+    # Server SN lands blank (so merge_dispatch can never match it), OLD PN
+    # lands in Server SN's slot, and so on all the way down the row.
+    paragraph_separated = (
+        "Riley | Alex \u2013 SITE-A @ 9:30am\n\n"
+        "Date\n\nTicket No#\n\nCase ID#\n\nServer SN\n\nRack Info\n\n"
+        "Faulty Part\n\nOLD PN\n\nNEW PN\n\nMaker\n\nModel\n\nEngineer\n\n"
+        "12/8/2026\n\nTKTA0000000015\n\nTKTB0000000013\n\n2TXA00013\n\n"
+        "TESTDC2_B1_G4-AA-03-17\n\nHard Drive\n\nPN-DEMO-0011\n\n"
+        "PN-DEMO-0011\n\nQ\n\nSC-MDL-001\n\nRiley | Alex Deliver onsite\n\n"
+        "12/8/2026\n\nTKTA0000000101\n\nTKTB0000000101\n\nDSN000104\n\n"
+        "TESTDC2_B1_G4-K-04-27\n\nMemory\n\nPN-DEMO-0008\n\n"
+        "PN-DEMO-0008\n\nQ\n\nMPN-DEMO-0100\n\nRiley | Alex Deliver onsite"
+    )
+    rows = parse_dispatch_table(paragraph_separated)
+    assert len(rows) == 2
+    first, second = rows
+    assert first["ticket_no"] == "TKTA0000000015"
+    assert first["case_id"] == "TKTB0000000013"
+    assert first["server_sn"] == "2TXA00013"
+    assert first["rack_info"] == "TESTDC2_B1_G4-AA-03-17"
+    assert first["faulty_part"] == "Hard Drive"
+    assert first["old_pn"] == "PN-DEMO-0011"
+    assert first["new_pn"] == "PN-DEMO-0011"
+    assert first["maker"] == "Q"
+    assert first["model"] == "SC-MDL-001"
+    assert first["engineer"] == "Riley | Alex Deliver onsite"
+    assert second["server_sn"] == "DSN000104"
+    assert second["old_pn"] == "PN-DEMO-0008"
+
+
+def test_paragraph_separated_row_with_genuinely_empty_cell():
+    # A truly empty cell inside this doubled format shows up as two
+    # consecutive blank lines (its own blank content line, then its
+    # separator) — must still resolve to "" in the right slot, not
+    # collapse and shift what follows.
+    paragraph_separated_blank_case_id = (
+        "Date\n\nTicket No#\n\nCase ID#\n\nServer SN\n\nRack Info\n\n"
+        "Faulty Part\n\nOLD PN\n\nNEW PN\n\nMaker\n\nModel\n\nEngineer\n\n"
+        "12/8/2026\n\nTKTA0000000015\n\n\n\n2TXA00013\n\n"
+        "TESTDC2_B1_G4-AA-03-17\n\nHard Drive\n\nPN-DEMO-0011\n\n"
+        "PN-DEMO-0011\n\nQ\n\nSC-MDL-001\n\nRiley | Alex Deliver onsite"
+    )
+    rows = parse_dispatch_table(paragraph_separated_blank_case_id)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["case_id"] == ""
+    assert row["server_sn"] == "2TXA00013"
+    assert row["old_pn"] == "PN-DEMO-0011"
+
+
+def test_shift_banner_pipe_separated_with_location_time():
+    # King's real paste: banner line has 3 names, en-dash + location/time
+    # trailer, and the rows below carry different (and inconsistent) names
+    # of their own -- the banner is who's on-site, not the row cells.
+    raw = (
+        "Taylor | Riley | Alex \u2013 SITE-A @ 9:30 am\n"
+        "Date\nTicket No#\nCase ID#\nServer SN\nRack Info\nFaulty Part\n"
+        "OLD PN\nNEW PN\nMaker\nModel\nEngineer\n"
+        "4/9/2026\nTKTA0000000100\nTKTB0000000100\nDSN000103\n"
+        "TESTDC3_B1_G2-R-08-13\nMemory\nPN-DEMO-0007\n"
+        "PN-DEMO-0007 borrow\nQ\nMPN-DEMO-0002\nTaylor | Riley Deliver onsite"
+    )
+    assert extract_shift_banner(raw) == ["Taylor", "Riley", "Alex"]
+
+
+def test_shift_banner_plain_hyphen_separator():
+    raw = "Taylor | Riley | Alex - SITE-A @ 9:30 am\nDate\nTicket No#\n"
+    assert extract_shift_banner(raw) == ["Taylor", "Riley", "Alex"]
+
+
+def test_shift_banner_absent_no_header():
+    # Paste starts straight at row 1 (no header, no banner) -- must not
+    # mistake the date row for a name list.
+    raw = "4/9/2026\nTKTA0000000100\nTKTB0000000100"
+    assert extract_shift_banner(raw) == []
+
+
+def test_shift_banner_absent_header_first():
+    # Header line is the very first line -- no preamble at all.
+    raw = "Date\nTicket No#\nCase ID#\n4/9/2026\n"
+    assert extract_shift_banner(raw) == []
+
+
+def test_shift_banner_dedupes_case_insensitive():
+    raw = "Riley | RILEY | Alex - SITE-A\nDate\n"
+    assert extract_shift_banner(raw) == ["Riley", "Alex"]
+
+
+def test_shift_banner_single_name_no_pipe():
+    raw = "Riley - solo shift\nDate\n"
+    assert extract_shift_banner(raw) == ["Riley"]
+
+
+if __name__ == "__main__":
+    for name, fn in sorted(globals().items()):
+        if name.startswith("test_") and callable(fn):
+            fn(); print("PASS", name)

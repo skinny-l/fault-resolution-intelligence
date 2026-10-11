@@ -1,0 +1,398 @@
+{
+  "title": "CoreBMC Power Fault Error Map (SC platform family)",
+  "scope": "SC-2200R, SC-2400H, SC-4800G, SC-1150S, SC-3300M running CoreBMC 3.x",
+  "problem": "A node fails to power on, drops unexpectedly, or logs a rail fault. The BMC records a rail-specific error pattern in the system event log and in the autolog bundle. The pattern names the rail that failed, and the rail determines which components are in scope — which is the difference between a targeted repair and swapping parts until it stops.",
+  "root_cause": "A power rail failing to come up in sequence, or collapsing at runtime. The failure originates in one of three places: the supply feeding the rail, the board-mounted regulator producing it, or the component drawing from it. The rail name narrows this to a handful of candidates. Memory rails narrow it further, to specific DIMM slots, because each PVDDQ rail feeds a known set of channels.",
+  "solution": "1. Capture the full SEL and the autolog bundle BEFORE removing AC. Rail events are held in volatile state on some firmware levels and are lost on power removal.\n2. Match the logged error pattern against this map to identify the rail and its suspect components.\n3. For a memory rail, the map gives the DIMM slots that rail feeds — reseat or replace within those slots only.\n4. Remove AC for 60 seconds, then retry power-on at minimum configuration.\n5. Add components back in groups, retesting after each, until the fault reproduces.\n6. A rail fault that reproduces at minimum configuration is a board or supply fault, not a component fault.",
+  "suggestions": "Do not start by replacing the system board. On this platform family the majority of rail faults resolve to a single component drawing out of spec, a partially seated module, or a supply that is not sharing load. The board is the last candidate, not the first.\nCheck whether both supplies are present, matched and sharing before investigating any rail — an unbalanced pair produces rail events that look like component faults.\nIf two or more unrelated rails assert in the same second, suspect the supply or the sequencer, not the components.",
+  "source_url": "",
+  "error_map": [
+    {
+      "error_pattern": "RAIL_P12V_MAIN_FAULT",
+      "power_rail": "P12V_MAIN",
+      "suspect_components": [
+        "SC-PS2000 power supply",
+        "SC-MB2200 system board",
+        "backplane power cabling"
+      ],
+      "dimm_slots": [],
+      "remark": "Affects everything downstream. Check supply pairing and load sharing before any component work."
+    },
+    {
+      "error_pattern": "RAIL_P12V_STBY_FAULT",
+      "power_rail": "P12V_STBY",
+      "suspect_components": [
+        "SC-PS2000 power supply",
+        "SC-MB2200 system board"
+      ],
+      "dimm_slots": [],
+      "remark": "Standby rail. A fault here usually means the node will not respond to a power-on request at all."
+    },
+    {
+      "error_pattern": "RAIL_P5V_AUX_FAULT",
+      "power_rail": "P5V_AUX",
+      "suspect_components": [
+        "SC-MB2200 system board",
+        "SC-BP24N backplane"
+      ],
+      "dimm_slots": []
+    },
+    {
+      "error_pattern": "RAIL_P3V3_AUX_FAULT",
+      "power_rail": "P3V3_AUX",
+      "suspect_components": [
+        "SC-MB2200 system board",
+        "SC-RS16X riser"
+      ],
+      "dimm_slots": []
+    },
+    {
+      "error_pattern": "RAIL_P3V_RTC_LOW",
+      "power_rail": "P3V_RTC",
+      "suspect_components": [
+        "CR2032 RTC cell",
+        "SC-MB2200 system board"
+      ],
+      "dimm_slots": [],
+      "remark": "Almost always a depleted coin cell. Replace the cell before suspecting the board."
+    },
+    {
+      "error_pattern": "RAIL_P1V8_PCH_FAULT",
+      "power_rail": "P1V8_PCH",
+      "suspect_components": [
+        "SC-MB2200 system board"
+      ],
+      "dimm_slots": []
+    },
+    {
+      "error_pattern": "RAIL_PVNN_PCH_FAULT",
+      "power_rail": "PVNN_PCH",
+      "suspect_components": [
+        "SC-MB2200 system board"
+      ],
+      "dimm_slots": []
+    },
+    {
+      "error_pattern": "RAIL_PVCCIN_CPU0_FAULT",
+      "power_rail": "PVCCIN_CPU0",
+      "suspect_components": [
+        "SC-CP9480 processor (socket 0)",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [],
+      "remark": "Reseat socket 0 and inspect for bent pins before condemning the board."
+    },
+    {
+      "error_pattern": "RAIL_PVCCIN_CPU1_FAULT",
+      "power_rail": "PVCCIN_CPU1",
+      "suspect_components": [
+        "SC-CP9480 processor (socket 1)",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [],
+      "remark": "Reseat socket 1 and inspect for bent pins before condemning the board."
+    },
+    {
+      "error_pattern": "VRHOT_CPU0",
+      "power_rail": "PVCCIN_CPU0",
+      "suspect_components": [
+        "SC-MB2200 system board VR",
+        "SC-FN80D fan module",
+        "air baffle"
+      ],
+      "dimm_slots": [],
+      "remark": "Thermal, not electrical. Check airflow over the VR area first."
+    },
+    {
+      "error_pattern": "VRHOT_CPU1",
+      "power_rail": "PVCCIN_CPU1",
+      "suspect_components": [
+        "SC-MB2200 system board VR",
+        "SC-FN80D fan module",
+        "air baffle"
+      ],
+      "dimm_slots": [],
+      "remark": "Thermal, not electrical. Check airflow over the VR area first."
+    },
+    {
+      "error_pattern": "RAIL_PVCCFA_CPU0_FAULT",
+      "power_rail": "PVCCFA_CPU0",
+      "suspect_components": [
+        "SC-CP9480 processor (socket 0)",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": []
+    },
+    {
+      "error_pattern": "RAIL_PVCCFA_CPU1_FAULT",
+      "power_rail": "PVCCFA_CPU1",
+      "suspect_components": [
+        "SC-CP9480 processor (socket 1)",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": []
+    },
+    {
+      "error_pattern": "RAIL_PVDDQ_AB_CPU0_FAULT",
+      "power_rail": "PVDDQ_AB_CPU0",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU0_A0",
+        "CPU0_B0"
+      ],
+      "remark": "Reseat or replace within these slots only. A fault that persists with all four slots empty is board-side."
+    },
+    {
+      "error_pattern": "RAIL_PVDDQ_CD_CPU0_FAULT",
+      "power_rail": "PVDDQ_CD_CPU0",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU0_C0",
+        "CPU0_D0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVDDQ_EF_CPU0_FAULT",
+      "power_rail": "PVDDQ_EF_CPU0",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU0_E0",
+        "CPU0_F0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVDDQ_GH_CPU0_FAULT",
+      "power_rail": "PVDDQ_GH_CPU0",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU0_G0",
+        "CPU0_H0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVDDQ_AB_CPU1_FAULT",
+      "power_rail": "PVDDQ_AB_CPU1",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU1_A0",
+        "CPU1_B0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVDDQ_CD_CPU1_FAULT",
+      "power_rail": "PVDDQ_CD_CPU1",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU1_C0",
+        "CPU1_D0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVDDQ_EF_CPU1_FAULT",
+      "power_rail": "PVDDQ_EF_CPU1",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU1_E0",
+        "CPU1_F0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVDDQ_GH_CPU1_FAULT",
+      "power_rail": "PVDDQ_GH_CPU1",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU1_G0",
+        "CPU1_H0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVPP_AB_CPU0_FAULT",
+      "power_rail": "PVPP_AB_CPU0",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU0_A0",
+        "CPU0_B0"
+      ],
+      "remark": "DIMM activation rail. Presents as a training failure more often than a hard power fault."
+    },
+    {
+      "error_pattern": "RAIL_PVPP_CD_CPU0_FAULT",
+      "power_rail": "PVPP_CD_CPU0",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU0_C0",
+        "CPU0_D0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVPP_AB_CPU1_FAULT",
+      "power_rail": "PVPP_AB_CPU1",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU1_A0",
+        "CPU1_B0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_PVPP_CD_CPU1_FAULT",
+      "power_rail": "PVPP_CD_CPU1",
+      "suspect_components": [
+        "SC-DR64G RDIMM",
+        "SC-MB2200 system board VR"
+      ],
+      "dimm_slots": [
+        "CPU1_C0",
+        "CPU1_D0"
+      ]
+    },
+    {
+      "error_pattern": "RAIL_P12V_RISER1_FAULT",
+      "power_rail": "P12V_RISER1",
+      "suspect_components": [
+        "SC-RS16X riser",
+        "SC-XA400 accelerator module",
+        "SC-NX200 adapter"
+      ],
+      "dimm_slots": [],
+      "remark": "Remove everything behind riser 1 and retest before replacing the riser."
+    },
+    {
+      "error_pattern": "RAIL_P12V_RISER2_FAULT",
+      "power_rail": "P12V_RISER2",
+      "suspect_components": [
+        "SC-RS16X riser",
+        "SC-XA400 accelerator module",
+        "SC-NX200 adapter"
+      ],
+      "dimm_slots": []
+    },
+    {
+      "error_pattern": "RAIL_P12V_BP_FAULT",
+      "power_rail": "P12V_BP",
+      "suspect_components": [
+        "SC-BP24N backplane",
+        "SC-NV7T6 NVMe drive",
+        "SC-HD18T SAS drive",
+        "backplane power cabling"
+      ],
+      "dimm_slots": [],
+      "remark": "A single shorted drive can pull this rail down. Depopulate the bank and add drives back in groups."
+    },
+    {
+      "error_pattern": "RAIL_P12V_OCP_FAULT",
+      "power_rail": "P12V_OCP",
+      "suspect_components": [
+        "SC-NX200 OCP adapter",
+        "SC-MB2200 system board"
+      ],
+      "dimm_slots": []
+    },
+    {
+      "error_pattern": "RAIL_P12V_XA_A_FAULT",
+      "power_rail": "P12V_XA_A",
+      "suspect_components": [
+        "SC-XA400 accelerator module",
+        "auxiliary power cabling",
+        "SC-RS16X riser"
+      ],
+      "dimm_slots": [],
+      "remark": "Accelerator auxiliary rail, modules 1-4. Check connector latching before replacing a module."
+    },
+    {
+      "error_pattern": "RAIL_P12V_XA_B_FAULT",
+      "power_rail": "P12V_XA_B",
+      "suspect_components": [
+        "SC-XA400 accelerator module",
+        "auxiliary power cabling",
+        "SC-RS16X riser"
+      ],
+      "dimm_slots": [],
+      "remark": "Accelerator auxiliary rail, modules 5-8."
+    },
+    {
+      "error_pattern": "PSU_OUTPUT_OC_ASSERT",
+      "power_rail": "P12V_MAIN",
+      "suspect_components": [
+        "SC-PS2000 power supply",
+        "SC-XA400 accelerator module",
+        "SC-MB2200 system board"
+      ],
+      "dimm_slots": [],
+      "remark": "Real overcurrent is plausible on accelerator nodes. Retest with accelerators removed."
+    },
+    {
+      "error_pattern": "PSU_INPUT_LOST",
+      "power_rail": "AC_INPUT",
+      "suspect_components": [
+        "SC-PS2000 power supply",
+        "PDU outlet",
+        "power cord"
+      ],
+      "dimm_slots": [],
+      "remark": "Input-side event. Check the outlet before touching the supply."
+    },
+    {
+      "error_pattern": "PSU_MISMATCH_DETECTED",
+      "power_rail": "P12V_MAIN",
+      "suspect_components": [
+        "SC-PS2000 power supply"
+      ],
+      "dimm_slots": [],
+      "remark": "Mismatched ratings or firmware. SC platforms require matched pairs."
+    },
+    {
+      "error_pattern": "PWR_GOOD_TIMEOUT",
+      "power_rail": "SEQUENCER",
+      "suspect_components": [
+        "SC-MB2200 system board",
+        "SC-PS2000 power supply",
+        "SC-CP9480 processor"
+      ],
+      "dimm_slots": [],
+      "remark": "The log names the sequence step that stalled — that step names the rail."
+    },
+    {
+      "error_pattern": "CPLD_SEQ_ABORT",
+      "power_rail": "SEQUENCER",
+      "suspect_components": [
+        "CPLD on SC-MB2200",
+        "CoreBMC firmware"
+      ],
+      "dimm_slots": [],
+      "remark": "Check the firmware set is qualified together before treating this as a hardware fault."
+    }
+  ]
+}
